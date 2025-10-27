@@ -4,7 +4,7 @@ Steady-state infinite-horizon Kalman filter.
 """
 
 import numpy as np
-from LQR_with_estimator.base_filter import BaseFilter
+from .base_filter import BaseFilter
 
 class KF_inf(BaseFilter):
     def __init__(self, T, dist, noise_dist, system_data, B,

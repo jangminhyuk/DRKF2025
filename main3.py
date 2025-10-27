@@ -11,12 +11,12 @@ from joblib import Parallel, delayed
 from pykalman import KalmanFilter
 import pandas as pd
 
-from LQR_with_estimator.KF import KF
-from LQR_with_estimator.DRKF_ours_inf import DRKF_ours_inf
+from estimator.KF import KF
+from estimator.DRKF_ours_inf import DRKF_ours_inf
 from common_utils import (save_data, is_stabilizable, is_detectable, is_positive_definite,
                          enforce_positive_definiteness)
 
-from LQR_with_estimator.base_filter import BaseFilter
+from estimator.base_filter import BaseFilter
 
 _temp_A, _temp_C = np.eye(2), np.eye(2)
 _temp_params = np.zeros((2, 1)), np.eye(2)

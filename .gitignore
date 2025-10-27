@@ -1,5 +1,5 @@
 /results
-/LQR_with_estimator/__pycache__
+/estimator/__pycache__
 /__pycache__
 analyze_inputs.py
 analyze_inputs_MPC.py

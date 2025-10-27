@@ -276,124 +276,57 @@ def _solve_theta_from_delta(a_nonneg, delta_max):
     a = max(0.0, float(a_nonneg))
     return max(0.0, (a*a + float(delta_max))**0.5 - a)
 
-def _theta_v_theorem3(phi_v, lam_min_v, lam_max_v, normC2, verbose=False, eps=1e-12):
-    dbg(verbose, "θ_v (Thm3) input", phi_v=phi_v, lam_min_v=lam_min_v, lam_max_v=lam_max_v, normC2=normC2)
-    bound = normC2 / (lam_max_v + eps)
-    if not (phi_v < bound):
-        dbg(verbose, "FAIL meas feasibility", need=f"phi_v < {bound}")
-        return None
-    denom = 1.0 - (phi_v / normC2) * lam_min_v
-    dbg(verbose, "Thm3 denom", denom=denom)
-    if denom <= 0:
-        dbg(verbose, "FAIL denom≤0 in (34)")
-        return None
-    Bv = lam_min_v / denom
-    dbg(verbose, "Thm3 RHS Bv", Bv=Bv)
-    if Bv < lam_max_v - 1e-12:
-        dbg(verbose, "FAIL RHS(34) < λ_max(Σ̂_v)", Bv=Bv, lam_max_v=lam_max_v)
-        return None
-    theta_v = max(0.0, Bv**0.5 - lam_max_v**0.5)
-    dbg(verbose, "θ_v (Thm3) ok", theta_v=theta_v)
-    return theta_v
 
-def _theta_v_opnorm(phi_v, lam_min_v, lam_max_v, normC2, verbose=False, eps=1e-12):
-    r = phi_v / (normC2 + eps)
-    delta_max = (r * lam_min_v * lam_min_v) / (1.0 + r * lam_min_v)
-    a = lam_max_v**0.5
-    theta_v = _solve_theta_from_delta(a, delta_max)
-    dbg(verbose, "θ_v (opnorm) calc", r=r, delta_max=delta_max, spd_margin=lam_min_v - delta_max, theta_v=theta_v)
-    return theta_v
-
-def _theta_w_cor3(phi_x, lam_min_w, lam_max_w, lam_min_v, normC2, normAplus2, verbose=False, eps=1e-12):
-    m = 1.0 / (lam_min_w + eps) + normC2 / (lam_min_v + eps)
-    dbg(verbose, "Cor3 m", m=m, phi_x=phi_x)
-    if not (0.0 <= phi_x < m):
-        dbg(verbose, "FAIL process feasibility", need=f"0 ≤ phi_x < m={m}")
-        return None
-    beta = phi_x / (normAplus2 * m * (m - phi_x))
-    theta_w = _solve_theta_from_delta(lam_max_w**0.5, beta)
-    dbg(verbose, "θ_w (Cor3) calc", beta=beta, theta_w=theta_w)
-    return theta_w
-
-def compute_theta_w_and_v(A, C, Sigma_w_nom, Sigma_v_nom, phi_T,
-                          method_v='opnorm',
-                          optimize_split=False,
-                          verbose=False,
-                          eps=1e-12):
-    """Compute radii (theta_w, theta_v) ensuring DRKF contraction."""
-    Sw = enforce_positive_definiteness((Sigma_w_nom + Sigma_w_nom.T) / 2.0)
-    Sv = enforce_positive_definiteness((Sigma_v_nom + Sigma_v_nom.T) / 2.0)
-    lam_w = eigvalsh(Sw); lam_v = eigvalsh(Sv)
-    lam_min_w, lam_max_w = float(lam_w[0]), float(lam_w[-1])
-    lam_min_v, lam_max_v = float(lam_v[0]), float(lam_v[-1])
-    normC2 = float(np.linalg.norm(C, 2)**2)
-    normAplus2 = float(np.linalg.norm(np.linalg.pinv(A), 2)**2)
-
-    dbg(verbose, "Spectra & norms",
-        lam_min_w=lam_min_w, lam_max_w=lam_max_w,
-        lam_min_v=lam_min_v, lam_max_v=lam_max_v,
-        normC2=normC2, normAplus2=normAplus2, phi_T=phi_T)
-
-    def solve_at(phi_v):
-        phi_x = phi_T - phi_v
-        dbg(verbose, "Try split", phi_v=phi_v, phi_x=phi_x)
-
-        tv_candidates = []
-        if method_v in ('theorem3', 'max'):
-            tv_t3 = _theta_v_theorem3(phi_v, lam_min_v, lam_max_v, normC2, verbose=verbose, eps=eps)
-            if tv_t3 is not None:
-                tv_candidates.append(tv_t3)
-        if method_v in ('opnorm', 'max'):
-            tv_op = _theta_v_opnorm(phi_v, lam_min_v, lam_max_v, normC2, verbose=verbose, eps=eps)
-            if tv_op is not None:
-                tv_candidates.append(tv_op)
-        if not tv_candidates:
-            dbg(verbose, "θ_v infeasible for this split")
-            return None, None
-        theta_v = max(tv_candidates) if method_v == 'max' else tv_candidates[0]
-        dbg(verbose, "θ_v chosen", theta_v=theta_v, method=method_v)
-
-        theta_w = _theta_w_cor3(phi_x, lam_min_w, lam_max_w, lam_min_v, normC2, normAplus2,
-                                verbose=verbose, eps=eps)
-        if theta_w is None:
-            dbg(verbose, "θ_w infeasible for this split")
-            return None, None
-
-        dbg(verbose, "Split OK", theta_w=theta_w, theta_v=theta_v)
-        return theta_w, theta_v
-
-    phi_v0 = 0.5 * phi_T
-    ans = solve_at(phi_v0)
-    if ans[0] is not None and ans[1] is not None:
-        return ans
-
-    if not optimize_split:
-        dbg(verbose, "No optimize_split; returning (None, None)")
-        return (None, None)
-
-    m = 1.0/(lam_min_w + eps) + normC2/(lam_min_v + eps)
-    lo = max(0.0, phi_T - (m - 1e-9))
-    hi = min(phi_T - 1e-9, normC2/(lam_max_v + eps) - 1e-9)
-    dbg(verbose, "Search interval", lower_phi_v=lo, upper_phi_v=hi, m=m)
-    if lo > hi:
-        dbg(verbose, "Empty search interval")
-        return (None, None)
-
-    best = (None, None, -float('inf'))
-    for pv in np.linspace(lo, hi, 200):
-        tw, tv = solve_at(pv)
-        if tw is None:
-            continue
-        score = tw + tv
-        if score > best[2]:
-            best = (tw, tv, score)
-
-    if best[0] is None:
-        dbg(verbose, "Search failed to find feasible split")
-        return (None, None)
-
-    dbg(verbose, "Search best", theta_w=best[0], theta_v=best[1], score=best[2])
-    return (best[0], best[1])
+def compute_theta_w_and_v(A, C, Sigma_w_nom, Sigma_v_nom, phi_T):
+    """Compute theta_w_max and theta_v_max with equal split φv = φx = φT/2.
+    
+    Args:
+        A: System matrix
+        C: Observation matrix  
+        Sigma_w_nom: Nominal process noise covariance
+        Sigma_v_nom: Nominal measurement noise covariance
+        phi_T: Contraction parameter
+        
+    Returns:
+        tuple: (theta_w_max, theta_v_max) uncertainty radii
+    """
+    eps = 1e-9  # for strict inequalities
+    
+    # Precompute values
+    sC = np.linalg.norm(C, 2)
+    Ap = np.linalg.pinv(A)
+    sAp = np.linalg.norm(Ap, 2)
+    
+    # Eigenvalues of covariance matrices
+    lam_w = np.linalg.eigvals(Sigma_w_nom)
+    lam_v = np.linalg.eigvals(Sigma_v_nom)
+    lam_w_min = np.min(np.real(lam_w))
+    lam_w_max = np.max(np.real(lam_w))
+    lam_v_min = np.min(np.real(lam_v))
+    lam_v_max = np.max(np.real(lam_v))
+    
+    # Maximum delta_x
+    delta_x_max = 1.0 / lam_w_min + (sC**2) / lam_v_min
+    
+    # Set phi splits with feasibility check
+    phi_x = phi_T / 2.0
+    phi_v = phi_T / 2.0
+    
+    # Check feasibility: require φx < δx_max
+    if phi_T / 2.0 >= delta_x_max:
+        print(f"[INFO] Feasibility check failed: φT/2 = {phi_T/2.0:.6f} >= δx_max = {delta_x_max:.6f}")
+        print(f"[INFO] Modifying phi_x = {delta_x_max - eps:.6f}, phi_v = {phi_T - (delta_x_max - eps):.6f}")
+        phi_x = delta_x_max - eps
+        phi_v = phi_T - phi_x
+    
+    # Measurement side calculation
+    delta_v_max = phi_v * (lam_v_min**2) / ((sC**2) + phi_v * lam_v_min)
+    theta_v_max = np.sqrt(lam_v_max + delta_v_max) - np.sqrt(lam_v_max)
+    
+    # Process side calculation  
+    theta_w_max = np.sqrt(lam_w_max + (phi_x / ((sAp**2) * delta_x_max * (delta_x_max - phi_x))) ) - np.sqrt(lam_w_max)
+    
+    return theta_w_max, theta_v_max
 
 
 
@@ -418,10 +351,7 @@ def run_dr_kf_once(n=2, m=1, steps=200, T=20, q=100,
 
         # --- θ_w, θ_v (with debug prints inside) ---
         theta_w, theta_v = compute_theta_w_and_v(
-            A, C, Sigma_w_nom, Sigma_v_nom, phi_T,
-            method_v='opnorm',          # try both and take larger feasible θ_v
-            optimize_split=True,     # search φ_v if symmetric split fails
-            verbose=False             # inline θ-debug already shown in your log
+            A, C, Sigma_w_nom, Sigma_v_nom, phi_T
         )
 
         print(f"[INFO] theta_w = {theta_w}, theta_v = {theta_v}")

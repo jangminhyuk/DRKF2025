@@ -10,11 +10,11 @@ import time
 from pykalman import KalmanFilter
 import matplotlib.pyplot as plt
 
-from LQR_with_estimator.DRKF_ours_inf import DRKF_ours_inf
+from estimator.DRKF_ours_inf import DRKF_ours_inf
 from common_utils import (save_data, is_stabilizable, is_detectable, is_positive_definite,
                          enforce_positive_definiteness)
 
-from LQR_with_estimator.base_filter import BaseFilter
+from estimator.base_filter import BaseFilter
 
 def normal(mu, Sigma, N=1, sampler=None):
     if sampler is None:

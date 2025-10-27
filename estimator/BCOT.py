@@ -5,7 +5,7 @@ Bi-Causal Optimal Transport (BCOT) robust filter.
 
 import numpy as np
 import time
-from LQR_with_estimator.utils import optimize
+from .utils import optimize
 
 class BCOT:
     def __init__(self, T, dist, noise_dist, system_data, B,
@@ -19,7 +19,7 @@ class BCOT:
                  x0_max=None, x0_min=None, w_max=None, w_min=None, v_max=None, v_min=None,
                  x0_scale=None, w_scale=None, v_scale=None,
                  input_lower_bound=None, input_upper_bound=None):
-"""Initialize BCOT filter."""
+        """Initialize BCOT filter.
           
           The following are provided in two sets:
             (i) True parameters (for simulating the system)

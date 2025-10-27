@@ -7,7 +7,7 @@ in a closed-loop LQR experiment. This is the CDC version with simplified SDP for
 
 import numpy as np
 import cvxpy as cp
-from LQR_with_estimator.base_filter import BaseFilter
+from .base_filter import BaseFilter
 
 class DRKF_ours_finite_CDC(BaseFilter):
     def __init__(self, T, dist, noise_dist, system_data, B,

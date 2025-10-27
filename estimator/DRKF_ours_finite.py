@@ -5,7 +5,7 @@ Distributionally robust Kalman filter (DRKF) for state estimation.
 
 import numpy as np
 import cvxpy as cp
-from LQR_with_estimator.base_filter import BaseFilter
+from .base_filter import BaseFilter
 
 class DRKF_ours_finite(BaseFilter):
     def __init__(self, T, dist, noise_dist, system_data, B,
@@ -19,7 +19,6 @@ class DRKF_ours_finite(BaseFilter):
                  x0_scale=None, w_scale=None, v_scale=None,
                  theta_x=None, theta_v=None, theta_w=None,
                  input_lower_bound=None, input_upper_bound=None):
-"""Initialize DRKF with robust parameters."""
         super().__init__(T, dist, noise_dist, system_data, B,
                         true_x0_mean, true_x0_cov, true_mu_w, true_Sigma_w, true_mu_v, true_Sigma_v,
                         nominal_x0_mean, nominal_x0_cov, nominal_mu_w, nominal_Sigma_w, nominal_mu_v, nominal_Sigma_v,
