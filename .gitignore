@@ -1,9 +1,3 @@
-/results/3d_data
-/results/estimation
-/results/estimation_with_controller
-/results/estimator
-/results/trajectory_tracking_controller
-/results/trajectory_tracking_MPC
 /estimator/__pycache__
 /__pycache__
 analyze_inputs.py
