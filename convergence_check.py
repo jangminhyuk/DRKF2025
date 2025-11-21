@@ -339,7 +339,6 @@ def run_dr_kf_once(n=2, m=1, steps=200, T=20, q=100,
         C = np.array([[1.0, -1.0]])
         Sigma_w_nom = 1.0 * np.eye(A.shape[0])
         Sigma_v_nom = 1.0 * np.eye(C.shape[0])
-
         # --- φ_T ---
         matrices = compute_matrices(T, A, Sigma_w_nom, C, Sigma_v_nom)
         tilde_phi_T = matrices["tilde_phi_T"]

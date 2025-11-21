@@ -20,32 +20,66 @@ plt.rcParams.update({
     'figure.titlesize': 24     # Figure title size
 })
 
+# def get_color_for_filter(filt, i):
+#     """Color mapping for filters."""
+#     if filt == 'drkf_neurips':
+#         return 'purple'
+#     elif filt == 'drkf_inf':
+#         return 'blue'
+#     elif filt == 'drkf_finite':
+#         return 'blue'
+#     elif filt == 'drkf_finite_cdc':
+#         return 'brown'
+#     elif filt == 'drkf_inf_cdc':
+#         return 'brown'
+#     elif filt == 'risk':
+#         return 'orange'
+#     elif filt == 'risk_seek':
+#         return 'darkviolet'
+#     elif filt == 'bcot':
+#         return 'red'
+#     elif filt == 'finite':
+#         return 'black'  # Same color as inf
+#     elif filt == 'inf':
+#         return 'black'
+#     else:
+#         # Use tab10 colormap for other methods
+#         colors = plt.cm.tab10(np.linspace(0, 1, 10))
+#         return colors[i % len(colors)]
+
 def get_color_for_filter(filt, i):
-    """Color mapping for filters."""
-    if filt == 'drkf_neurips':
-        return 'purple'
-    elif filt == 'drkf_inf':
-        return 'blue'
-    elif filt == 'drkf_finite':
-        return 'blue'
-    elif filt == 'drkf_finite_cdc':
-        return 'brown'
-    elif filt == 'drkf_inf_cdc':
-        return 'brown'
-    elif filt == 'risk':
-        return 'orange'
-    elif filt == 'risk_seek':
-        return 'darkviolet'
-    elif filt == 'bcot':
-        return 'red'
-    elif filt == 'finite':
-        return 'black'  # Same color as inf
-    elif filt == 'inf':
-        return 'black'
-    else:
-        # Use tab10 colormap for other methods
-        colors = plt.cm.tab10(np.linspace(0, 1, 10))
-        return colors[i % len(colors)]
+    """Soft academic color mapping for filters (Set2-inspired palette)."""
+    # Define a soft academic palette (muted but distinct)
+    bright_palette = [
+            "#1f77b4",  # strong blue
+            "#ff7f0e",  # vivid orange
+            "#2ca02c",  # rich green
+            "#d62728",  # deep red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#7f7f7f",  # gray
+            "#bcbd22",  # olive
+            "#17becf"   # cyan
+        ]
+    
+    # Map specific filters to consistent soft colors
+    color_map = {
+        'drkf_neurips': bright_palette[0],
+        'drkf_inf': bright_palette[3],
+        'drkf_finite': bright_palette[3],
+        'drkf_finite_cdc': bright_palette[2],
+        'drkf_inf_cdc': bright_palette[2],
+        'risk': bright_palette[1],
+        'risk_seek': bright_palette[4],
+        'bcot': bright_palette[5],
+        'finite': bright_palette[7],
+        'inf': bright_palette[7],
+    }
+    
+    return color_map.get(filt, bright_palette[i % len(bright_palette)])
+
+
 
 def load_data(file_path):
     """Load pickled data from file"""
@@ -222,7 +256,7 @@ def create_regret_violin_plot(all_results, raw_experiments_data, optimal_regret_
 def create_theta_effect_plot(all_results, dist, filters, filter_labels):
     """Create plot showing effect of robust parameter theta on averaged MSE"""
     
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 9))
     
     # Extract robust values and sort them
     robust_vals = sorted(all_results.keys())
@@ -598,13 +632,13 @@ def create_mpc_cost_violin_plot(all_results, raw_experiments_data, optimal_resul
 def create_mpc_cost_theta_effect_plot(raw_experiments_data, dist, filters, filter_labels):
     """Create plot showing effect of robust parameter theta on MPC cost"""
     
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(12, 8))
     
     # Extract robust values and sort them
     robust_vals = sorted(raw_experiments_data.keys())
     
     # Define markers for each method
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', '+', 'x']
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
     
     # Define letter labels (A) to (L) - expanded to accommodate more filters
     letter_labels = ['(A)', '(B)', '(C)', '(D)', '(E)', '(F)', '(G)', '(H)', '(I)', '(J)', '(K)', '(L)']
@@ -629,7 +663,7 @@ def create_mpc_cost_theta_effect_plot(raw_experiments_data, dist, filters, filte
     # Plot each filter
     for i, filt in enumerate(filters):
         # Determine line style based on filter type (finite versions get dotted lines)
-        if filt in ['finite', 'drkf_finite', 'drkf_finite_cdc']:
+        if filt in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
             linestyle = ':'  # Dotted line for TV (finite) versions
         else:
             linestyle = '-'  # Solid line for SS (inf) and other methods
@@ -644,7 +678,7 @@ def create_mpc_cost_theta_effect_plot(raw_experiments_data, dist, filters, filte
                         marker='None', 
                         color=get_color_for_filter(filt, i),
                         linestyle=linestyle,
-                        linewidth=2,
+                        linewidth=2.5,
                         label=label)
         else:
             # For robust methods, plot actual theta effect
@@ -665,30 +699,40 @@ def create_mpc_cost_theta_effect_plot(raw_experiments_data, dist, filters, filte
             
             ax.plot(theta_vals, cost_vals, 
                     marker=markers[i % len(markers)], 
+                    markerfacecolor='white',
+                    markeredgecolor=get_color_for_filter(filt, i),
                     color=get_color_for_filter(filt, i),
+                    markeredgewidth=1.2,
                     linestyle=linestyle,
-                    linewidth=2,
-                    markersize=8,
+                    linewidth=2.5,
+                    markersize=12,
                     label=label)
     
     # Customize plot
-    ax.set_xlabel('θ')
+    ax.set_xlabel(r'$\theta$')
     ax.set_ylabel('Average MPC Cost', fontsize=28)
     ax.set_xscale('log')
-    ax.set_yscale('log')
-    ax.grid(True, alpha=0.3)
+    # ax.set_yscale('log')
+    # ax.grid(True, alpha=0.3)
+    ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+    ax.tick_params(axis='both', which='major', width=1.5, length=6)
+    ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+
     
     # Clip y-axis to handle BCOT outliers - use 1.5x finite KF cost as reference
     if 'finite' in filters and 'finite' in cost_aggregated[robust_vals[0]]:
         finite_kf_cost = cost_aggregated[robust_vals[0]]['finite']
         y_clip_max = finite_kf_cost * 1.3
         ax.set_ylim(top=y_clip_max)
+        ax.set_yticks(range(100, int(y_clip_max), 100))
         print(f"Clipping MPC cost theta effect plot y-axis at {y_clip_max:.4f} (1.3x time-varying KF)")
     
-    ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2)
+    ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2, frameon=False)
+    ax.set_ylim(bottom=100.0)
     
-    plt.tight_layout()
-    plt.subplots_adjust(bottom=0.15)
+    plt.tight_layout(pad=2.0)
+    plt.subplots_adjust(bottom=0.12, left=0.12, top=0.7, right=0.98)
+
     
     # Ensure results directory exists
     results_path = "./results/trajectory_tracking_MPC/"
@@ -900,6 +944,146 @@ def create_input_trajectory_plots(raw_experiments_data, optimal_results, dist, f
     plt.close()
     print(f"Input trajectory plots saved as: {output_path}")
 
+def create_combined_mpc_cost_plot(normal_data, quadratic_data, filters, filter_labels):
+    """Create side-by-side plots showing Average MPC Cost for normal and quadratic distributions"""
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(32, 9), gridspec_kw={'wspace': 0.25})
+    
+    # Load data for both distributions
+    normal_all_results = normal_data['all_results']
+    normal_raw_experiments = normal_data['raw_experiments_data']
+    normal_optimal_results = normal_data['optimal_results']
+    
+    quadratic_all_results = quadratic_data['all_results']
+    quadratic_raw_experiments = quadratic_data['raw_experiments_data']
+    quadratic_optimal_results = quadratic_data['optimal_results']
+    
+    # Function to create cost theta effect plot for a single distribution
+    def plot_distribution_cost(ax, all_results, raw_experiments_data, optimal_results, dist_name):
+        # Extract robust values and sort them
+        robust_vals = sorted(raw_experiments_data.keys())
+        
+        # Define markers for each method
+        markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
+        
+        # Define letter labels (A) to (L) - expanded to accommodate more filters
+        letter_labels = ['(A)', '(B)', '(C)', '(D)', '(E)', '(F)', '(G)', '(H)', '(I)', '(J)', '(K)', '(L)']
+        
+        # Aggregate cost data from raw experiments for each robust value and filter
+        cost_aggregated = {}
+        for robust_val in robust_vals:
+            cost_aggregated[robust_val] = {}
+            experiments = raw_experiments_data[robust_val]
+            
+            for filt in filters:
+                cost_key = f'{filt}_costs'
+                all_costs = []
+                
+                for exp in experiments:
+                    if cost_key in exp:
+                        all_costs.extend(exp[cost_key])
+                
+                if all_costs:
+                    cost_aggregated[robust_val][filt] = np.mean(all_costs)
+        
+        # Plot each filter
+        for i, filt in enumerate(filters):
+            # Skip filters that don't have data in optimal_results
+            if filt not in optimal_results:
+                continue
+                
+            # Determine line style based on filter type (finite versions get dotted lines)
+            if filt in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
+                linestyle = ':'  # Dotted line for inf versions
+            else:
+                linestyle = '-'  # Solid line for finite and other methods
+                
+            if filt in ['finite', 'inf']:
+                # For non-robust methods, plot horizontal line using first robust parameter data
+                if filt in cost_aggregated[robust_vals[0]]:
+                    cost_vals = [cost_aggregated[robust_vals[0]][filt]] * len(robust_vals)
+                    label = f"{letter_labels[i]} {filter_labels[filt]}"
+                    
+                    ax.plot(robust_vals, cost_vals, 
+                            marker='None', 
+                            color=get_color_for_filter(filt, i),
+                            linestyle=linestyle,
+                            linewidth=2.5,
+                            label=label)
+            else:
+                # For robust methods, plot actual theta effect
+                theta_vals = []
+                cost_vals = []
+                
+                for rv in robust_vals:
+                    if filt in cost_aggregated[rv]:
+                        theta_vals.append(rv)
+                        cost_vals.append(cost_aggregated[rv][filt])
+                
+                # Skip this filter if no data points available
+                if not cost_vals:
+                    print(f"Warning: No MPC cost data available for filter '{filt}' in {dist_name} - skipping")
+                    continue
+                    
+                label = f"{letter_labels[i]} {filter_labels[filt]}"
+                
+                ax.plot(theta_vals, cost_vals, 
+                        marker=markers[i % len(markers)], 
+                        markerfacecolor='white',
+                        markeredgecolor=get_color_for_filter(filt, i),
+                        color=get_color_for_filter(filt, i),
+                        markeredgewidth=1.2,
+                        linestyle=linestyle,
+                        linewidth=2.5,
+                        markersize=12,
+                        label=label)
+        
+        # Customize plot
+        ax.set_xlabel(r'$\theta$')
+        ax.set_ylabel('Average MPC Cost', fontsize=28)
+        ax.set_xscale('log')
+        ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+        ax.tick_params(axis='both', which='major', width=1.5, length=6)
+        ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+    
+        
+        # Clip y-axis to handle BCOT outliers - use 1.3x finite KF cost as reference
+        if 'finite' in filters and 'finite' in cost_aggregated[robust_vals[0]]:
+            finite_kf_cost = cost_aggregated[robust_vals[0]]['finite']
+            y_clip_max = finite_kf_cost * 1.3
+            ax.set_ylim(top=y_clip_max)
+            ax.set_ylim(bottom=100.0)
+            print(f"Clipping {dist_name} MPC cost plot y-axis at {y_clip_max:.4f} (1.3x time-varying KF)")
+    
+    # Plot normal distribution on left
+    plot_distribution_cost(ax1, normal_all_results, normal_raw_experiments, normal_optimal_results, 'normal')
+    
+    # Plot quadratic distribution on right
+    plot_distribution_cost(ax2, quadratic_all_results, quadratic_raw_experiments, quadratic_optimal_results, 'quadratic')
+    
+    # Add subplot labels a) and b)
+    ax1.text(0.5, -0.25, 'a)', transform=ax1.transAxes, fontsize=24, ha='center', va='top')
+    ax2.text(0.5, -0.25, 'b)', transform=ax2.transAxes, fontsize=24, ha='center', va='top')
+    
+    # Create a shared legend at the top in two rows
+    handles, labels = ax1.get_legend_handles_labels()
+    # Calculate number of columns to create 2 rows
+    ncol = (len(labels) + 1) // 2  # Round up division to get columns for 2 rows
+    fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.98), loc='upper center', ncol=ncol, frameon=False, fontsize=21)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.82, bottom=0.25)
+    
+    # Ensure results directory exists
+    results_path = "./results/trajectory_tracking_MPC/"
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    
+    output_path = os.path.join(results_path, 'combined_mpc_cost_normal_quadratic.pdf')
+    plt.savefig(output_path, format='pdf', dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Combined MPC cost comparison plot saved as: {output_path}")
+
 def main(dist):
     """Main function to create all plots"""
     
@@ -996,10 +1180,69 @@ def main(dist):
             same = "Yes" if mse_theta == regret_theta else "No"
             print(f"{filter_labels[filt]:<30} {str(mse_theta):<15} {str(regret_theta):<15} {same:<10}")
 
+def create_combined_plots():
+    """Create combined plots comparing normal and quadratic distributions"""
+    
+    results_path = "./results/trajectory_tracking_MPC/"
+    
+    # Load data for both distributions
+    try:
+        # Normal distribution data
+        normal_data = {
+            'all_results': load_data(os.path.join(results_path, 'overall_results_normal_trajectory_tracking.pkl')),
+            'optimal_results': load_data(os.path.join(results_path, 'optimal_results_normal_trajectory_tracking.pkl')),
+            'optimal_regret_results': load_data(os.path.join(results_path, 'optimal_regret_results_normal_trajectory_tracking.pkl')),
+            'raw_experiments_data': load_data(os.path.join(results_path, 'raw_experiments_normal_trajectory_tracking.pkl'))
+        }
+        
+        # Quadratic distribution data
+        quadratic_data = {
+            'all_results': load_data(os.path.join(results_path, 'overall_results_quadratic_trajectory_tracking.pkl')),
+            'optimal_results': load_data(os.path.join(results_path, 'optimal_results_quadratic_trajectory_tracking.pkl')),
+            'optimal_regret_results': load_data(os.path.join(results_path, 'optimal_regret_results_quadratic_trajectory_tracking.pkl')),
+            'raw_experiments_data': load_data(os.path.join(results_path, 'raw_experiments_quadratic_trajectory_tracking.pkl'))
+        }
+    except FileNotFoundError as e:
+        print(f"Error: Could not find results files for both distributions.")
+        print(f"Missing file: {e}")
+        print("Make sure you've run main5_1_with_controller.py for both normal and quadratic distributions.")
+        return
+    
+    # Get filters from the loaded results
+    available_filters = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
+    # Use filters that are available in both distributions
+    filters = [f for f in available_filters if f in normal_data['optimal_results'] and f in quadratic_data['optimal_results']]
+    
+    filter_labels = {
+        'finite': "Time-varying KF",
+        'inf': "Steady-state KF",
+        'risk': "Risk-Sensitive Filter (risk-averse)",
+        'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
+        'drkf_neurips': "Time-varying DRKF [5]",
+        'bcot': "Time-varying DRKF [10]",
+        'drkf_finite_cdc': "Time-varying DRKF [12]",
+        'drkf_inf_cdc': "Steady-state DRKF [12]",
+        'drkf_finite': "Time-varying DRKF (ours)",
+        'drkf_inf': "Steady-state DRKF (ours)"
+    }
+    
+    print("Creating combined MPC cost comparison plot for normal vs quadratic distributions...")
+    
+    # Create the combined MPC cost plot
+    create_combined_mpc_cost_plot(normal_data, quadratic_data, filters, filter_labels)
+    
+    print("Combined plot created successfully!")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create plots from main5_1_with_controller.py results")
     parser.add_argument('--dist', default="normal", type=str,
                         help="Distribution type (normal or quadratic)")
+    parser.add_argument('--combined', action='store_true',
+                        help="Create combined plots comparing normal vs quadratic distributions")
     
     args = parser.parse_args()
-    main(args.dist)
+    
+    if args.combined:
+        create_combined_plots()
+    else:
+        main(args.dist)
