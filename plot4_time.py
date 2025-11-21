@@ -18,32 +18,66 @@ plt.rcParams.update({
     'figure.titlesize': 24     # Figure title size
 })
 
+# def get_color_for_filter(filt, i):
+#     """Color mapping for filters."""
+#     if filt == 'drkf_neurips':
+#         return 'purple'
+#     elif filt == 'drkf_inf':
+#         return 'blue'
+#     elif filt == 'drkf_finite':
+#         return 'blue'
+#     elif filt == 'drkf_finite_cdc':
+#         return 'brown'
+#     elif filt == 'drkf_inf_cdc':
+#         return 'brown'
+#     elif filt == 'risk':
+#         return 'orange'
+#     elif filt == 'risk_seek':
+#         return 'darkviolet'
+#     elif filt == 'bcot':
+#         return 'red'
+#     elif filt == 'finite':
+#         return 'black'
+#     elif filt == 'inf':
+#         return 'black'
+#     else:
+#         # Use tab10 colormap for other methods
+#         colors = plt.cm.tab10(np.linspace(0, 1, 10))
+#         return colors[i % len(colors)]
+
 def get_color_for_filter(filt, i):
-    """Color mapping for filters."""
-    if filt == 'drkf_neurips':
-        return 'purple'
-    elif filt == 'drkf_inf':
-        return 'blue'
-    elif filt == 'drkf_finite':
-        return 'blue'
-    elif filt == 'drkf_finite_cdc':
-        return 'brown'
-    elif filt == 'drkf_inf_cdc':
-        return 'brown'
-    elif filt == 'risk':
-        return 'orange'
-    elif filt == 'risk_seek':
-        return 'darkviolet'
-    elif filt == 'bcot':
-        return 'red'
-    elif filt == 'finite':
-        return 'black'
-    elif filt == 'inf':
-        return 'black'
-    else:
-        # Use tab10 colormap for other methods
-        colors = plt.cm.tab10(np.linspace(0, 1, 10))
-        return colors[i % len(colors)]
+    """Soft academic color mapping for filters (Set2-inspired palette)."""
+    # Define a soft academic palette (muted but distinct)
+    bright_palette = [
+            "#1f77b4",  # strong blue
+            "#ff7f0e",  # vivid orange
+            "#2ca02c",  # rich green
+            "#d62728",  # deep red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#7f7f7f",  # gray
+            "#bcbd22",  # olive
+            "#17becf"   # cyan
+        ]
+    
+    # Map specific filters to consistent soft colors
+    color_map = {
+        'drkf_neurips': bright_palette[0],
+        'drkf_inf': bright_palette[3],
+        'drkf_finite': bright_palette[3],
+        'drkf_finite_cdc': bright_palette[2],
+        'drkf_inf_cdc': bright_palette[2],
+        'risk': bright_palette[1],
+        'risk_seek': bright_palette[4],
+        'bcot': bright_palette[5],
+        'finite': bright_palette[7],
+        'inf': bright_palette[7],
+    }
+    
+    return color_map.get(filt, bright_palette[i % len(bright_palette)])
+
+
 
 def load_data(file_path):
     """Load pickled data from file"""
@@ -86,13 +120,18 @@ def create_computation_time_plot():
         return
     
     # Create the plot
-    fig, ax = plt.subplots(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(12, 9))
     
-    # Define markers for each method (matching plot5_1.py style)
-    markers = ['o', 's', '^', 'D', 'v', '<']
-    
-    # Define letter labels (A) to (F)
-    letter_labels = ['(E)', '(F)', '(G)', '(H)', '(I)', '(J)', '(K)', '(L)']
+    # Define markers for each method (matching plot1_with_MPC.py MPC cost theta effect style)
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
+
+    # Define standard filter order and corresponding letters (matching plot1_with_MPC.py)
+    standard_filter_order = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
+    letter_labels_map = {
+        'finite': '(A)', 'inf': '(B)', 'risk': '(C)', 'risk_seek': '(D)', 
+        'drkf_neurips': '(E)', 'bcot': '(F)', 'drkf_finite_cdc': '(G)', 
+        'drkf_inf_cdc': '(H)', 'drkf_finite': '(I)', 'drkf_inf': '(J)'
+    }
     
     # Get all unique T values across all filters
     all_T_values = set()
@@ -119,36 +158,49 @@ def create_computation_time_plot():
             continue
             
         # Determine line style based on filter type (finite versions get dotted lines)
-        if filter_name in ['finite', 'drkf_finite', 'drkf_finite_cdc', 'drkf_neurips', 'bcot']:
-            linestyle = ':'  # Dotted line for TV (finite) versions
+        if filter_name in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
+            linestyle = ':'  # Dotted line for SS (infinite) versions
         else:
-            linestyle = '-'  # Solid line for SS (inf) and other methods
+            linestyle = '-'  # Solid line for TV (fininte) and other methods
             
-        # Create label with letter prefix
-        label = f"{letter_labels[i]} {filter_labels[filter_name]}"
+        # Create label with correct letter prefix based on filter name
+        letter_prefix = letter_labels_map.get(filter_name, f'({chr(65+i)})')  # Fallback to position-based if not found
+        label = f"{letter_prefix} {filter_labels[filter_name]}"
+        
+        # Get marker index based on standard order position
+        marker_idx = standard_filter_order.index(filter_name) if filter_name in standard_filter_order else i
         
         # Plot the data
         ax.plot(T_vals, mean_times,
-                marker=markers[i % len(markers)],
-                color=get_color_for_filter(filter_name, i),
+                marker=markers[marker_idx % len(markers)],
+                markerfacecolor='white',
+                markeredgecolor=get_color_for_filter(filter_name, marker_idx),
+                color=get_color_for_filter(filter_name, marker_idx),
+                markeredgewidth=1.2,
                 linestyle=linestyle,
-                linewidth=2,
-                markersize=8,
+                linewidth=2.5,
+                markersize=12,
                 label=label)
         
     # Customize plot
     ax.set_xlabel('T', fontsize=26)
-    ax.set_ylabel('Computation time (s)', fontsize=28)
+    ax.set_ylabel('Computation Time (sec.)', fontsize=28)
     ax.set_yscale('log')  # Use log scale for y-axis
-    ax.grid(True, alpha=0.3)
+
+    ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+    ax.tick_params(axis='both', which='major', width=1.5, length=6)
+    ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+
     
     # Set reasonable axis limits
     ax.set_xlim(left=0, right=105)
     
     # Legend
-    legend = ax.legend(bbox_to_anchor=(0.5, -0.14), loc='upper center', ncol=2)
+    ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2, frameon=False)
     
-    plt.tight_layout()
+    plt.tight_layout(pad=2.0)
+    plt.subplots_adjust(bottom=0.12, left=0.12, top=0.7, right=0.98)
+
     
     # Save the plot
     output_path = os.path.join(results_path, 'computation_time_comparison.pdf')

@@ -20,32 +20,68 @@ plt.rcParams.update({
     'figure.titlesize': 24     # Figure title size
 })
 
+# plt.style.use('ggplot')  # or 'classic' for pure Matplotlib
+
+
+# def get_color_for_filter(filt, i):
+#     """Color mapping for filters."""
+#     if filt == 'drkf_neurips':
+#         return 'purple'
+#     elif filt == 'drkf_inf':
+#         return 'blue'
+#     elif filt == 'drkf_finite':
+#         return 'blue'
+#     elif filt == 'drkf_finite_cdc':
+#         return 'brown'
+#     elif filt == 'drkf_inf_cdc':
+#         return 'brown'
+#     elif filt == 'risk':
+#         return 'orange'
+#     elif filt == 'risk_seek':
+#         return 'darkviolet'
+#     elif filt == 'bcot':
+#         return 'red'
+#     elif filt == 'finite':
+#         return 'black'  # Same color as inf
+#     elif filt == 'inf':
+#         return 'black'
+#     else:
+#         # Use tab10 colormap for other methods
+#         colors = plt.cm.tab10(np.linspace(0, 1, 10))
+#         return colors[i % len(colors)]
+
 def get_color_for_filter(filt, i):
-    """Color mapping for filters."""
-    if filt == 'drkf_neurips':
-        return 'purple'
-    elif filt == 'drkf_inf':
-        return 'blue'
-    elif filt == 'drkf_finite':
-        return 'blue'
-    elif filt == 'drkf_finite_cdc':
-        return 'brown'
-    elif filt == 'drkf_inf_cdc':
-        return 'brown'
-    elif filt == 'risk':
-        return 'orange'
-    elif filt == 'risk_seek':
-        return 'darkviolet'
-    elif filt == 'bcot':
-        return 'red'
-    elif filt == 'finite':
-        return 'black'  # Same color as inf
-    elif filt == 'inf':
-        return 'black'
-    else:
-        # Use tab10 colormap for other methods
-        colors = plt.cm.tab10(np.linspace(0, 1, 10))
-        return colors[i % len(colors)]
+    """Soft academic color mapping for filters (Set2-inspired palette)."""
+    # Define a soft academic palette (muted but distinct)
+    bright_palette = [
+            "#1f77b4",  # strong blue
+            "#ff7f0e",  # vivid orange
+            "#2ca02c",  # rich green
+            "#d62728",  # deep red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#7f7f7f",  # gray
+            "#bcbd22",  # olive
+            "#17becf"   # cyan
+        ]
+    
+    # Map specific filters to consistent soft colors
+    color_map = {
+        'drkf_neurips': bright_palette[0],
+        'drkf_inf': bright_palette[3],
+        'drkf_finite': bright_palette[3],
+        'drkf_finite_cdc': bright_palette[2],
+        'drkf_inf_cdc': bright_palette[2],
+        'risk': bright_palette[1],
+        'risk_seek': bright_palette[4],
+        'bcot': bright_palette[5],
+        'finite': bright_palette[7],
+        'inf': bright_palette[7],
+    }
+    
+    return color_map.get(filt, bright_palette[i % len(bright_palette)])
+
 
 def load_data(file_path):
     """Load pickled data from file"""
@@ -232,7 +268,7 @@ def create_theta_effect_plot(all_results, dist, filters, filter_labels):
     robust_vals = sorted(all_results.keys())
     
     # Define markers for each method
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', '+', 'x']
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
     
     # Use global color function for consistent coloring
     
@@ -333,7 +369,7 @@ def create_regret_theta_effect_plot(all_results, dist, filters, filter_labels):
     robust_vals = sorted(all_results.keys())
     
     # Define markers for each method
-    markers = ['o', 's', '^', 'D', 'v', '<', '>', 'p', '*', 'h', '+', 'x']
+    markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
     
     # Use global color function for consistent coloring
     
@@ -343,10 +379,10 @@ def create_regret_theta_effect_plot(all_results, dist, filters, filter_labels):
     # Plot each filter
     for i, filt in enumerate(filters):
         # Determine line style based on filter type (finite versions get dotted lines)
-        if filt in ['finite', 'drkf_finite', 'drkf_finite_cdc']:
-            linestyle = ':'  # Dotted line for TV (finite) versions
+        if filt in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
+            linestyle = ':'  # Dotted line for SS (infinite) versions
         else:
-            linestyle = '-'  # Solid line for SS (inf) and other methods
+            linestyle = '-'  # Solid line for TV (finite) and other methods
             
         if filt in ['finite', 'inf']:
             # For non-robust methods, plot horizontal line
@@ -376,31 +412,51 @@ def create_regret_theta_effect_plot(all_results, dist, filters, filter_labels):
         
         # Plot without error bars
         # For non-robust methods, draw horizontal line without markers
+        cl = 0.2 #confidence level
         if filt in ['finite', 'inf']:
             ax.plot(robust_vals, regret_vals, 
                     marker='None', 
                     color=get_color_for_filter(filt, i),
                     linestyle=linestyle,
-                    linewidth=2,
+                    linewidth=2.5,
                     label=label)
+            # ax.fill_between(robust_vals,
+            #     np.array(regret_vals) - cl*np.array(regret_stds),
+            #     np.array(regret_vals) + cl*np.array(regret_stds),
+            #     color=get_color_for_filter(filt, i),
+            #     alpha=0.15
+            # )
         else:
             ax.plot(robust_vals_filtered, regret_vals, 
                     marker=markers[i % len(markers)], 
+                    markerfacecolor='white',
+                    markeredgecolor=get_color_for_filter(filt, i),
                     color=get_color_for_filter(filt, i),
+                    markeredgewidth=1.2,
                     linestyle=linestyle,
-                    linewidth=2,
-                    markersize=8,
-                    label=label)
-            
-    
-    
+                    linewidth=2.5,
+                    markersize=12,
+                    label=label)  
+            # ax.fill_between(robust_vals_filtered,
+            #     np.array(regret_vals) - cl*np.array(regret_stds),
+            #     np.array(regret_vals) + cl*np.array(regret_stds),
+            #     color=get_color_for_filter(filt, i),
+            #     alpha=0.15
+            # )
+                
+        
+        
     # Let matplotlib auto-scale to the actual plotted data
     
     # Customize plot
-    ax.set_xlabel('θ')
+    ax.set_xlabel(r'$\theta$')
     ax.set_ylabel('Average Regret MSE', fontsize=28, labelpad=15)
     ax.set_xscale('log')
-    ax.grid(True, alpha=0.3)
+    # ax.grid(True, alpha=0.3)
+    ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+    ax.tick_params(axis='both', which='major', width=1.5, length=6)
+    ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+
     
     # Clip y-axis to handle BCOT outliers and set reasonable lower bound
     y_clip_max = None
@@ -421,9 +477,12 @@ def create_regret_theta_effect_plot(all_results, dist, filters, filter_labels):
     ax.set_ylim(bottom=y_clip_min)
     print(f"Setting regret theta effect plot y-axis bottom at {y_clip_min:.4f}")
     
-    ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2)
+    ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2, frameon=False)
     
-    plt.tight_layout()
+    plt.tight_layout(pad=2.0)
+    plt.subplots_adjust(bottom=0.12, left=0.12, top=0.7, right=0.98)
+
+
     
     # Ensure results directory exists
     results_path = "./results/estimation/"

@@ -82,18 +82,46 @@ def plot_trajectory_subplots(trajectory_data, filters_order, desired_traj, time,
     """Create individual plots for each filter showing 2D X-Y position trajectories"""
     
     # Colors for all 10 filters
+    # colors = {
+    #     'finite': 'black',             # Same color as inf
+    #     'inf': 'black',
+    #     'risk': 'orange',
+    #     'risk_seek': 'darkviolet',
+    #     'drkf_neurips': 'purple',
+    #     'bcot': 'red',
+    #     'drkf_finite_cdc': 'brown',    # Same color as drkf_inf_cdc
+    #     'drkf_inf_cdc': 'brown',
+    #     'drkf_finite': 'blue',         # Same color as drkf_inf
+    #     'drkf_inf': 'blue'
+    # }
+
+    bright_palette = [
+            "#1f77b4",  # strong blue
+            "#ff7f0e",  # vivid orange
+            "#2ca02c",  # rich green
+            "#d62728",  # deep red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#7f7f7f",  # gray
+            "#bcbd22",  # olive
+            "#17becf"   # cyan
+        ]
+    
+    # Map specific filters to consistent soft colors
     colors = {
-        'finite': 'black',             # Same color as inf
-        'inf': 'black',
-        'risk': 'orange',
-        'risk_seek': 'darkviolet',
-        'drkf_neurips': 'purple',
-        'bcot': 'red',
-        'drkf_finite_cdc': 'brown',    # Same color as drkf_inf_cdc
-        'drkf_inf_cdc': 'brown',
-        'drkf_finite': 'blue',         # Same color as drkf_inf
-        'drkf_inf': 'blue'
+        'drkf_neurips': bright_palette[0],
+        'drkf_inf': bright_palette[3],
+        'drkf_finite': bright_palette[3],
+        'drkf_finite_cdc': bright_palette[2],
+        'drkf_inf_cdc': bright_palette[2],
+        'risk': bright_palette[1],
+        'risk_seek': bright_palette[4],
+        'bcot': bright_palette[5],
+        'finite': bright_palette[7],
+        'inf': bright_palette[7],
     }
+
     
     # Filter names for all 10 filters
     filter_names = {
@@ -174,8 +202,8 @@ def plot_trajectory_subplots(trajectory_data, filters_order, desired_traj, time,
         ax.scatter(desired_traj[0, -1], desired_traj[2, -1], marker='X', s=150, color='black', linewidth=3)
         
         # Formatting
-        ax.set_xlabel('X position [m]', fontsize=28)
-        ax.set_ylabel('Y position [m]', fontsize=28)
+        ax.set_xlabel('X position (m)', fontsize=28)
+        ax.set_ylabel('Y position (m)', fontsize=28)
         
         # Create title
         title_text = filter_names[filt]
@@ -191,7 +219,7 @@ def plot_trajectory_subplots(trajectory_data, filters_order, desired_traj, time,
         ax.set_aspect('equal', adjustable='box')
         
         # Add legend with proper order and large font
-        ax.legend(['Desired Trajectory', '1-std tube', 'Mean Trajectory'], fontsize=22, loc='best')
+        # ax.legend(['Desired Trajectory', '1-std tube', 'Mean Trajectory'], fontsize=22, loc='best')
         
         plt.tight_layout()
         
@@ -210,17 +238,31 @@ def plot_subplots_all_filters(trajectory_data, filters_order, desired_traj, time
     """Create a subplot figure with all filters in separate subplots"""
     
     # Colors for all 10 filters
+    bright_palette = [
+            "#1f77b4",  # strong blue
+            "#ff7f0e",  # vivid orange
+            "#2ca02c",  # rich green
+            "#d62728",  # deep red
+            "#9467bd",  # purple
+            "#8c564b",  # brown
+            "#e377c2",  # pink
+            "#7f7f7f",  # gray
+            "#bcbd22",  # olive
+            "#17becf"   # cyan
+        ]
+    
+    # Map specific filters to consistent soft colors
     colors = {
-        'finite': 'black',             # Same color as inf
-        'inf': 'black',
-        'risk': 'orange',
-        'risk_seek': 'darkviolet',
-        'drkf_neurips': 'purple',
-        'bcot': 'red',
-        'drkf_finite_cdc': 'brown',    # Same color as drkf_inf_cdc
-        'drkf_inf_cdc': 'brown',
-        'drkf_finite': 'blue',         # Same color as drkf_inf
-        'drkf_inf': 'blue'
+        'drkf_neurips': bright_palette[0],
+        'drkf_inf': bright_palette[3],
+        'drkf_finite': bright_palette[3],
+        'drkf_finite_cdc': bright_palette[2],
+        'drkf_inf_cdc': bright_palette[2],
+        'risk': bright_palette[1],
+        'risk_seek': bright_palette[4],
+        'bcot': bright_palette[5],
+        'finite': bright_palette[7],
+        'inf': bright_palette[7],
     }
     
     # Filter names for subplot titles
@@ -329,8 +371,8 @@ def plot_subplots_all_filters(trajectory_data, filters_order, desired_traj, time
         title_text = f"({alphabet_label}) {filter_names[filt]}"
         
         ax.set_title(title_text, fontsize=16, pad=8)
-        ax.set_xlabel('X position [m]', fontsize=14)
-        ax.set_ylabel('Y position [m]', fontsize=14)
+        ax.set_xlabel('X position (m)', fontsize=14)
+        ax.set_ylabel('Y position (m)', fontsize=14)
         
         # Set specific tick values
         ax.set_xticks([-5, 0, 5])
@@ -354,8 +396,8 @@ def plot_subplots_all_filters(trajectory_data, filters_order, desired_traj, time
     ]
     
     # Add legend to the figure with more space from subplots
-    fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.00), 
-               ncol=3, fontsize=16, frameon=True)
+    # fig.legend(handles=legend_elements, loc='lower center', bbox_to_anchor=(0.5, -0.00), 
+    #            ncol=3, fontsize=16, frameon=True)
     
     plt.tight_layout()
     plt.subplots_adjust(bottom=0.15, top=0.95, hspace=0.45, wspace=-0.1)  # Make more room for legend, less for title

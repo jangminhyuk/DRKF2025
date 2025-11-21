@@ -129,7 +129,7 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_exe
         w_max = w_min = x0_max = x0_min = None
         x0_scale = w_scale = v_scale = None
     elif dist == "quadratic":
-        w_max = 0.1 * np.ones(nx)
+        w_max = 0.2 * np.ones(nx)
         w_min = -0.1 * np.ones(nx)
         mu_w = (0.5 * (w_max + w_min))[:, None]
         Sigma_w = 3.0/20.0 * np.diag((w_max - w_min)**2)
@@ -137,7 +137,7 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_exe
         x0_min = -0.1 * np.ones(nx)
         x0_mean = (0.5 * (x0_max + x0_min))[:, None]
         x0_cov = 3.0/20.0 * np.diag((x0_max - x0_min)**2)
-        v_min = -0.1 * np.ones(ny)
+        v_min = -0.2 * np.ones(ny)
         v_max = 0.1 * np.ones(ny)
         mu_v = (0.5 * (v_max + v_min))[:, None]
         Sigma_v = 3.0/20.0 * np.diag((v_max - v_min)**2)

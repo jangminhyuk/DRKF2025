@@ -52,7 +52,7 @@ def create_scalability_plot():
     
     # Customize plot
     ax.set_xlabel('System Dimension', fontsize=28)
-    ax.set_ylabel('Computation time (s)', fontsize=28)
+    ax.set_ylabel('Computation Time (sec.)', fontsize=28)
     ax.set_yscale('log')  # Use log scale for y-axis (matching plot_time.py)
     ax.grid(True, alpha=0.3)
     
