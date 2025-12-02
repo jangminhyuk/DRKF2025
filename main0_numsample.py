@@ -548,7 +548,7 @@ def main(dist, num_sim, num_exp ):
     # Configurable filter execution list - modify this to enable/disable filters
     # Available filters: 'finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf'
     filters_to_execute = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
-    filters_to_execute = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
+    #filters_to_execute = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
     filters = filters_to_execute
     filter_labels = {
         'finite': "Time-varying KF",

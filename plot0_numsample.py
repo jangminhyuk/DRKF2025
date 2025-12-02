@@ -145,7 +145,7 @@ def create_ndata_effect_plot(all_ndata_results, dist, filters, filter_labels):
     
     # Customize plot
     ax.set_xlabel('Number of samples')
-    ax.set_ylabel('Regret MSE', fontsize=28, labelpad=15)
+    ax.set_ylabel('Average Regret MSE', fontsize=28, labelpad=15)
     ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
     ax.tick_params(axis='both', which='major', width=1.5, length=6)
     ax.tick_params(axis='both', which='minor', width=1.0, length=4)
@@ -164,23 +164,21 @@ def create_ndata_effect_plot(all_ndata_results, dist, filters, filter_labels):
     
     ax.set_xlim(max(0, x_min - padding), x_max + padding)
     
-    # Set reasonable y-axis bounds
-    # Get all regret values to determine clipping
-    all_regret_values = []
+    # Clip y-axis to preserve scale without BCOT outliers
+    # Calculate reasonable upper bound excluding BCOT at N=5
+    reasonable_regret_values = []
     for ndata in N_data_values:
         if ndata in all_ndata_results:
             optimal_regret_results = all_ndata_results[ndata]['optimal_regret_results']
             for filt in filters:
                 if filt in optimal_regret_results:
-                    all_regret_values.append(optimal_regret_results[filt]['regret'])
+                    # Skip BCOT at N=5 for scale calculation
+                    if filt == 'bcot' and ndata == 5:
+                        continue
+                    reasonable_regret_values.append(optimal_regret_results[filt]['regret'])
     
-    if all_regret_values:
-        max_regret = max(all_regret_values)
-        min_regret = min(all_regret_values)
-        
-        # Set y-axis bounds with some padding
-        y_padding = 0.1 * abs(max_regret - min_regret) if max_regret != min_regret else 0.1 * abs(max_regret)
-        ax.set_ylim(bottom=min_regret - y_padding, top=max_regret + y_padding)
+    # Set fixed y-axis limits for regret plot
+    ax.set_ylim(bottom=-0.2, top=3.0)
     
     ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2, frameon=False)
     
@@ -224,11 +222,11 @@ def create_ndata_effect_mse_plot(all_ndata_results, dist, filters, filter_labels
     
     # Plot each filter
     for i, filt in enumerate(filters):
-        # Determine line style based on filter type (finite versions get dotted lines)
-        if filt in ['finite', 'drkf_finite', 'drkf_finite_cdc']:
-            linestyle = ':'  # Dotted line for TV (finite) versions
+        # Determine line style based on filter type (infinite versions get dotted lines)
+        if filt in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
+            linestyle = ':'  # Dotted line for SS (infinite) versions
         else:
-            linestyle = '-'  # Solid line for SS (inf) and other methods
+            linestyle = '-'  # Solid line for TV (finite) and other methods
         
         # Collect data points for this filter across N_data values
         ndata_vals = []
@@ -294,6 +292,26 @@ def create_ndata_effect_mse_plot(all_ndata_results, dist, filters, filter_labels
         padding = max(1, x_range * 0.05)
     
     ax.set_xlim(max(0, x_min - padding), x_max + padding)
+    
+    # Clip y-axis to preserve scale without BCOT outliers
+    # Calculate reasonable upper bound excluding BCOT at N=5
+    reasonable_mse_values = []
+    for ndata in N_data_values:
+        if ndata in all_ndata_results:
+            optimal_results = all_ndata_results[ndata]['optimal_results']
+            for filt in filters:
+                if filt in optimal_results:
+                    # Skip BCOT at N=5 for scale calculation
+                    if filt == 'bcot' and ndata == 5:
+                        continue
+                    reasonable_mse_values.append(optimal_results[filt]['mse'])
+    
+    if reasonable_mse_values:
+        max_reasonable = max(reasonable_mse_values)
+        # Add 10% padding to the reasonable max
+        y_upper_limit = max_reasonable * 1.1
+        # Set both upper and lower bounds for MSE plot
+        ax.set_ylim(bottom=7e-2, top=y_upper_limit)
     
     ax.legend(bbox_to_anchor=(0.5, -0.15), loc='upper center', ncol=2, frameon=False)
     
@@ -411,6 +429,358 @@ def load_combined_ndata_results(dist, ndata_values=None):
     
     return all_ndata_results
 
+def create_combined_ndata_effect_plot(normal_data, quadratic_data, filters, filter_labels):
+    """Create side-by-side plots showing N_data effect on regret for normal and quadratic distributions"""
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 8), gridspec_kw={'wspace': 0.25})
+    
+    # Function to create N_data effect plot for a single distribution
+    def plot_distribution_ndata_effect(ax, all_ndata_results, dist_name):
+        # Extract N_data values and sort them
+        N_data_values = sorted(all_ndata_results.keys())
+        
+        # Define markers for each method
+        markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
+        
+        # Define fixed letter labels for each specific filter (one-to-one mapping)
+        filter_letter_map = {
+            'finite': '(A)',
+            'inf': '(B)', 
+            'risk': '(C)',
+            'risk_seek': '(D)',
+            'drkf_neurips': '(E)',
+            'bcot': '(F)',
+            'drkf_finite_cdc': '(G)',
+            'drkf_inf_cdc': '(H)',
+            'drkf_finite': '(I)',
+            'drkf_inf': '(J)'
+        }
+        
+        # Plot each filter
+        for i, filt in enumerate(filters):
+            # Determine line style based on filter type (finite versions get dotted lines)
+            if filt in ['inf', 'drkf_inf', 'drkf_inf_cdc']:
+                linestyle = ':'  # Dotted line for SS (infinite) versions
+            else:
+                linestyle = '-'  # Solid line for TV (finite) and other methods
+            
+            # Collect data points for this filter across N_data values
+            ndata_vals = []
+            regret_vals = []
+            regret_stds = []
+            
+            for ndata in N_data_values:
+                if ndata in all_ndata_results:
+                    optimal_regret_results = all_ndata_results[ndata]['optimal_regret_results']
+                    if filt in optimal_regret_results:
+                        ndata_vals.append(ndata)
+                        regret_vals.append(optimal_regret_results[filt]['regret'])
+                        regret_stds.append(optimal_regret_results[filt]['regret_std'])
+            
+            # Skip this filter if no data points available
+            if not regret_vals:
+                print(f"Warning: No data available for filter '{filt}' in {dist_name} - skipping")
+                continue
+            
+            letter_label = filter_letter_map.get(filt, '(?)')  # Default to '(?)' if filter not in map
+            label = f"{letter_label} {filter_labels[filt]}"
+            
+            # Plot with markers
+            if filt in ['finite', 'inf']:
+                # For non-robust methods, use simple line without markers
+                ax.plot(ndata_vals, regret_vals, 
+                        marker='None', 
+                        color=get_color_for_filter(filt, i),
+                        linestyle=linestyle,
+                        linewidth=2.5,
+                        label=label)
+            else:
+                # For robust methods, use markers
+                ax.plot(ndata_vals, regret_vals, 
+                        marker=markers[i % len(markers)], 
+                        markerfacecolor='white',
+                        markeredgecolor=get_color_for_filter(filt, i),
+                        color=get_color_for_filter(filt, i),
+                        markeredgewidth=1.2,
+                        linestyle=linestyle,
+                        linewidth=2.5,
+                        markersize=12,
+                        label=label)
+        
+        # Customize plot
+        ax.set_xlabel('Number of samples')
+        ax.set_ylabel('Average Regret MSE', fontsize=28, labelpad=15)
+        ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+        ax.tick_params(axis='both', which='major', width=1.5, length=6)
+        ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+        
+        # Set x-axis to show only the N_data values we have
+        ax.set_xticks(N_data_values)
+        
+        # Set x-axis limits with appropriate padding based on the range
+        x_min, x_max = min(N_data_values), max(N_data_values)
+        x_range = x_max - x_min
+        
+        if x_min <= 5:  # For small values, use fixed padding
+            padding = 1
+        else:  # For larger ranges, use proportional padding
+            padding = max(1, x_range * 0.05)
+        
+        ax.set_xlim(max(0, x_min - padding), x_max + padding)
+        
+        # Clip y-axis to preserve scale without BCOT outliers
+        # Calculate reasonable upper bound excluding BCOT at N=5
+        reasonable_regret_values = []
+        for ndata in N_data_values:
+            if ndata in all_ndata_results:
+                optimal_regret_results = all_ndata_results[ndata]['optimal_regret_results']
+                for filt in filters:
+                    if filt in optimal_regret_results:
+                        # Skip BCOT at N=5 for scale calculation
+                        if filt == 'bcot' and ndata == 5:
+                            continue
+                        reasonable_regret_values.append(optimal_regret_results[filt]['regret'])
+        
+        # Set fixed y-axis limits for regret plot
+        ax.set_ylim(bottom=-0.2, top=3.0)
+    
+    # Plot normal distribution on left
+    plot_distribution_ndata_effect(ax1, normal_data, 'normal')
+    
+    # Plot quadratic distribution on right  
+    plot_distribution_ndata_effect(ax2, quadratic_data, 'quadratic')
+    
+    # Add subplot labels a) and b)
+    ax1.text(0.5, -0.25, 'a)', transform=ax1.transAxes, fontsize=24, ha='center', va='top')
+    ax2.text(0.5, -0.25, 'b)', transform=ax2.transAxes, fontsize=24, ha='center', va='top')
+    
+    # Create a shared legend at the top in two rows
+    handles, labels = ax1.get_legend_handles_labels()
+    # Calculate number of columns to create 2 rows
+    ncol = (len(labels) + 1) // 2  # Round up division to get columns for 2 rows
+    fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.98), loc='upper center', ncol=ncol, frameon=False, fontsize=21)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.82, bottom=0.25)
+    
+    # Ensure results directory exists
+    results_path = "./results/ndata_study/"
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    
+    output_path = os.path.join(results_path, 'combined_ndata_effect_regret_normal_quadratic.pdf')
+    plt.savefig(output_path, format='pdf', dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Combined N_data effect plot saved as: {output_path}")
+
+def create_combined_ndata_effect_mse_plot(normal_data, quadratic_data, filters, filter_labels):
+    """Create side-by-side plots showing N_data effect on MSE for normal and quadratic distributions"""
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(24, 8), gridspec_kw={'wspace': 0.25})
+    
+    # Function to create N_data effect MSE plot for a single distribution
+    def plot_distribution_ndata_mse_effect(ax, all_ndata_results, dist_name):
+        # Extract N_data values and sort them
+        N_data_values = sorted(all_ndata_results.keys())
+        
+        # Define markers for each method
+        markers = ['o', 's', '^', 'D', 'v', '<', '>', '>', 'o', 'o', '+', 'x']
+        
+        # Define fixed letter labels for each specific filter (one-to-one mapping)
+        filter_letter_map = {
+            'finite': '(A)',
+            'inf': '(B)', 
+            'risk': '(C)',
+            'risk_seek': '(D)',
+            'drkf_neurips': '(E)',
+            'bcot': '(F)',
+            'drkf_finite_cdc': '(G)',
+            'drkf_inf_cdc': '(H)',
+            'drkf_finite': '(I)',
+            'drkf_inf': '(J)'
+        }
+        
+        # Plot each filter
+        for i, filt in enumerate(filters):
+            # Determine line style based on filter type (finite versions get dotted lines)
+            if filt in ['finite', 'drkf_finite', 'drkf_finite_cdc']:
+                linestyle = ':'  # Dotted line for TV (finite) versions
+            else:
+                linestyle = '-'  # Solid line for SS (inf) and other methods
+            
+            # Collect data points for this filter across N_data values
+            ndata_vals = []
+            mse_vals = []
+            mse_stds = []
+            
+            for ndata in N_data_values:
+                if ndata in all_ndata_results:
+                    optimal_results = all_ndata_results[ndata]['optimal_results']
+                    if filt in optimal_results:
+                        ndata_vals.append(ndata)
+                        mse_vals.append(optimal_results[filt]['mse'])
+                        mse_stds.append(optimal_results[filt]['mse_std'])
+            
+            # Skip this filter if no data points available
+            if not mse_vals:
+                print(f"Warning: No data available for filter '{filt}' in {dist_name} - skipping")
+                continue
+            
+            letter_label = filter_letter_map.get(filt, '(?)')  # Default to '(?)' if filter not in map
+            label = f"{letter_label} {filter_labels[filt]}"
+            
+            # Plot with markers
+            if filt in ['finite', 'inf']:
+                # For non-robust methods, use simple line without markers
+                ax.plot(ndata_vals, mse_vals, 
+                        marker='None', 
+                        color=get_color_for_filter(filt, i),
+                        linestyle=linestyle,
+                        linewidth=2.5,
+                        label=label)
+            else:
+                # For robust methods, use markers
+                ax.plot(ndata_vals, mse_vals, 
+                        marker=markers[i % len(markers)], 
+                        markerfacecolor='white',
+                        markeredgecolor=get_color_for_filter(filt, i),
+                        color=get_color_for_filter(filt, i),
+                        markeredgewidth=1.2,
+                        linestyle=linestyle,
+                        linewidth=2.5,
+                        markersize=12,
+                        label=label)
+        
+        # Customize plot
+        ax.set_xlabel('Number of samples')
+        ax.set_ylabel('Average MSE', fontsize=28, labelpad=15)
+        # ax.set_yscale('log')  # Use log scale for MSE as in original plots
+        ax.grid(True, which='major', linestyle='--', linewidth=1.0, alpha=0.4)
+        ax.tick_params(axis='both', which='major', width=1.5, length=6)
+        ax.tick_params(axis='both', which='minor', width=1.0, length=4)
+        
+        # Set x-axis to show only the N_data values we have
+        ax.set_xticks(N_data_values)
+        
+        # Set x-axis limits with appropriate padding based on the range
+        x_min, x_max = min(N_data_values), max(N_data_values)
+        x_range = x_max - x_min
+        
+        if x_min <= 5:  # For small values, use fixed padding
+            padding = 1
+        else:  # For larger ranges, use proportional padding
+            padding = max(1, x_range * 0.05)
+        
+        ax.set_xlim(max(0, x_min - padding), x_max + padding)
+        
+        # Clip y-axis to preserve scale without BCOT outliers
+        # Calculate reasonable upper bound excluding BCOT at N=5
+        reasonable_mse_values = []
+        for ndata in N_data_values:
+            if ndata in all_ndata_results:
+                optimal_results = all_ndata_results[ndata]['optimal_results']
+                for filt in filters:
+                    if filt in optimal_results:
+                        # Skip BCOT at N=5 for scale calculation
+                        if filt == 'bcot' and ndata == 5:
+                            continue
+                        reasonable_mse_values.append(optimal_results[filt]['mse'])
+        
+        if reasonable_mse_values:
+            max_reasonable = max(reasonable_mse_values)
+            # Add 10% padding to the reasonable max
+            y_upper_limit = max_reasonable * 1.1
+            # Set both upper and lower bounds for MSE plot
+            ax.set_ylim(bottom=7e-2, top=y_upper_limit)
+    
+    # Plot normal distribution on left
+    plot_distribution_ndata_mse_effect(ax1, normal_data, 'normal')
+    
+    # Plot quadratic distribution on right
+    plot_distribution_ndata_mse_effect(ax2, quadratic_data, 'quadratic')
+    
+    # Add subplot labels a) and b)
+    ax1.text(0.5, -0.25, 'a)', transform=ax1.transAxes, fontsize=24, ha='center', va='top')
+    ax2.text(0.5, -0.25, 'b)', transform=ax2.transAxes, fontsize=24, ha='center', va='top')
+    
+    # Create a shared legend at the top in two rows
+    handles, labels = ax1.get_legend_handles_labels()
+    # Calculate number of columns to create 2 rows
+    ncol = (len(labels) + 1) // 2  # Round up division to get columns for 2 rows
+    fig.legend(handles, labels, bbox_to_anchor=(0.5, 0.98), loc='upper center', ncol=ncol, frameon=False, fontsize=21)
+    
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.82, bottom=0.25)
+    
+    # Ensure results directory exists
+    results_path = "./results/ndata_study/"
+    if not os.path.exists(results_path):
+        os.makedirs(results_path)
+    
+    output_path = os.path.join(results_path, 'combined_ndata_effect_mse_normal_quadratic.pdf')
+    plt.savefig(output_path, format='pdf', dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Combined N_data effect MSE plot saved as: {output_path}")
+
+def create_combined_plots():
+    """Create combined plots comparing normal and quadratic distributions"""
+    
+    # Determine which N_data values to load (same as main function)
+    ndata_values = [5, 10, 20, 30, 40, 50]
+    
+    # Load data for both distributions
+    try:
+        # Normal distribution data
+        normal_data = load_combined_ndata_results('normal', ndata_values)
+        
+        # Quadratic distribution data
+        quadratic_data = load_combined_ndata_results('quadratic', ndata_values)
+    except FileNotFoundError as e:
+        print(f"Error: Could not find results files for both distributions.")
+        print(f"Missing file: {e}")
+        print("Make sure you've run main0_numsample.py for both normal and quadratic distributions.")
+        return
+    
+    # Get filters from the loaded results
+    available_filters = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
+    
+    # Use filters that are available in both distributions
+    filters = []
+    for f in available_filters:
+        found_normal = False
+        found_quadratic = False
+        for ndata_res in normal_data.values():
+            if f in ndata_res['optimal_results'] or f in ndata_res['optimal_regret_results']:
+                found_normal = True
+                break
+        for ndata_res in quadratic_data.values():
+            if f in ndata_res['optimal_results'] or f in ndata_res['optimal_regret_results']:
+                found_quadratic = True
+                break
+        if found_normal and found_quadratic:
+            filters.append(f)
+    
+    filter_labels = {
+        'finite': "Time-varying KF",
+        'inf': "Steady-state KF",
+        'risk': "Risk-Sensitive Filter (risk-averse)",
+        'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
+        'drkf_neurips': "Time-varying DRKF [9]",
+        'bcot': "Time-varying DRKF [12]",
+        'drkf_finite_cdc': "Time-varying DRKF [14]",
+        'drkf_inf_cdc': "Steady-state DRKF [14]",
+        'drkf_finite': "Time-varying DRKF (ours)",
+        'drkf_inf': "Steady-state DRKF (ours)"
+    }
+    
+    print("Creating combined N_data effect plots for normal vs quadratic distributions...")
+    
+    # Create the combined N_data effect plots
+    create_combined_ndata_effect_plot(normal_data, quadratic_data, filters, filter_labels)
+    create_combined_ndata_effect_mse_plot(normal_data, quadratic_data, filters, filter_labels)
+    
+    print("Combined plots created successfully!")
+
 def main(dist):
     """Main function to create N_data effect plots
     
@@ -438,7 +808,7 @@ def main(dist):
     # Get filters from the first N_data result to match main0_numsample.py execution list
     first_ndata = list(all_ndata_results.keys())[0]
     available_filters = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'bcot', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
-    available_filters = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
+    #available_filters = ['finite', 'inf', 'risk', 'risk_seek', 'drkf_neurips', 'drkf_finite_cdc', 'drkf_inf_cdc', 'drkf_finite', 'drkf_inf']
     # Only use filters that have results in at least one N_data
     filters = []
     for f in available_filters:
@@ -455,10 +825,10 @@ def main(dist):
         'inf': "Steady-state KF",
         'risk': "Risk-Sensitive Filter (risk-averse)",
         'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
-        'drkf_neurips': "Time-varying DRKF [5]",
-        'bcot': "Time-varying DRKF [10]",
-        'drkf_finite_cdc': "Time-varying DRKF [12]",
-        'drkf_inf_cdc': "Steady-state DRKF [12]",
+        'drkf_neurips': "Time-varying DRKF [9]",
+        'bcot': "Time-varying DRKF [12]",
+        'drkf_finite_cdc': "Time-varying DRKF [14]",
+        'drkf_inf_cdc': "Steady-state DRKF [14]",
         'drkf_finite': "Time-varying DRKF (ours)",
         'drkf_inf': "Steady-state DRKF (ours)"
     }
@@ -520,6 +890,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Create N_data effect plots from main0_numsample.py results")
     parser.add_argument('--dist', default="normal", type=str,
                         help="Distribution type (normal or quadratic)")
+    parser.add_argument('--combined', action='store_true',
+                        help="Create combined plots comparing normal vs quadratic distributions")
     
     args = parser.parse_args()
-    main(args.dist)
+    
+    if args.combined:
+        create_combined_plots()
+    else:
+        main(args.dist)
