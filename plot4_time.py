@@ -101,10 +101,10 @@ def create_computation_time_plot():
             'inf': "Steady-state KF",
             'risk': "Risk-Sensitive Filter (risk-averse)",
             'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
-            'drkf_neurips': "Time-varying DRKF [5]",
-            'bcot': "Time-varying DRKF [10]",
-            'drkf_finite_cdc': "Time-varying DRKF [12]",
-            'drkf_inf_cdc': "Steady-state DRKF [12]",
+            'drkf_neurips': "Time-varying DRKF [9]",
+            'bcot': "Time-varying DRKF [12]",
+            'drkf_finite_cdc': "Time-varying DRKF [14]",
+            'drkf_inf_cdc': "Steady-state DRKF [14]",
             'drkf_finite': "Time-varying DRKF (ours)",
             'drkf_inf': "Steady-state DRKF (ours)"
         }

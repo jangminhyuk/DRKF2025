@@ -31,7 +31,8 @@ def compute_envelope_scalars(Sigma_hat, theta, nominal_matrix=None):
         lambda_min_nominal = np.min(np.real(nominal_eigs))
         lambda_max_nominal = np.max(np.real(nominal_eigs))
         
-        underline_lambda = lambda_min_nominal
+        underline_lambda = lambda_min_nominal 
+        #underline_lambda = max(0, np.sqrt(lambda_min_nominal) - theta)**2
         overline_lambda = (np.sqrt(lambda_max_nominal) + theta)**2
         
     else:

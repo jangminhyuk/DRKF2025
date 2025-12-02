@@ -59,8 +59,10 @@ class DRKF_ours_finite(BaseFilter):
         theta_x = cp.Parameter(nonneg=True, name='theta_x')
         Sigma_v_hat = cp.Parameter((self.ny, self.ny), name='Sigma_v_hat')
         theta_v = cp.Parameter(nonneg=True, name='theta_v')
-        obj = cp.Maximize(cp.trace(X))
+        lam_min_x_nom = cp.Parameter(nonneg=True, name='lam_min_x')
+        lam_min_v_nom = cp.Parameter(nonneg=True, name='lam_min_v')
         
+        obj = cp.Maximize(cp.trace(X))
         constraints = [
             cp.bmat([[X_pred - X, X_pred @ self.C.T],
                      [self.C @ X_pred, self.C @ X_pred @ self.C.T + Sigma_v]
@@ -74,8 +76,10 @@ class DRKF_ours_finite(BaseFilter):
                      [Z.T, Sigma_v]
                     ]) >> 0,
             X >> 0,
-            X_pred >> 0,
-            Sigma_v >> 0,
+            #X_pred >> 0,
+            #Sigma_v >> 0,
+            X_pred >> lam_min_x_nom* np.eye(self.nx),
+            Sigma_v >> lam_min_v_nom * np.eye(self.ny)
         ]
         
         prob = cp.Problem(obj, constraints)
@@ -90,6 +94,8 @@ class DRKF_ours_finite(BaseFilter):
         params[1].value = self.theta_x
         params[2].value = self.nominal_Sigma_v
         params[3].value = self.theta_v
+        params[4].value = np.min(np.real(np.linalg.eigvals(X_pred_hat)))
+        params[5].value = np.min(np.real(np.linalg.eigvals(self.nominal_Sigma_v)))
         
         prob.solve(solver=cp.MOSEK)
         
@@ -124,7 +130,8 @@ class DRKF_ours_finite(BaseFilter):
         Sigma_v_hat = cp.Parameter((self.ny, self.ny), name='Sigma_v_hat')  # nominal measurement noise covariance
         theta_v = cp.Parameter(nonneg=True, name='theta_v')
         X_post_prev = cp.Parameter((self.nx, self.nx), name='X_post_prev')
-        
+        lam_min_v_nom = cp.Parameter(nonneg=True, name='lam_min_v')
+        lam_min_w_nom = cp.Parameter(nonneg=True, name='lam_min_w')
         # Objective: maximize trace(X)
         obj = cp.Maximize(cp.trace(X))
         
@@ -144,8 +151,10 @@ class DRKF_ours_finite(BaseFilter):
             X_pred == self.A @ X_post_prev @ self.A.T + Sigma_w,
             X >> 0,
             X_pred >> 0,
-            Sigma_v >> 0,
-            Sigma_w >> 0
+            #Sigma_v >> 0,
+            #Sigma_w >> 0,
+            Sigma_v >> lam_min_v_nom * np.eye(self.ny),
+            Sigma_w >> lam_min_w_nom * np.eye(self.nx)
         ]
         
         prob = cp.Problem(obj, constraints)
@@ -160,6 +169,8 @@ class DRKF_ours_finite(BaseFilter):
         params[2].value = self.nominal_Sigma_v
         params[3].value = self.theta_v
         params[4].value = X_post_prev
+        params[5].value = np.min(np.real(np.linalg.eigvals(self.nominal_Sigma_v)))
+        params[6].value = np.min(np.real(np.linalg.eigvals(self.nominal_Sigma_w)))
         
         prob.solve(solver=cp.MOSEK)
         

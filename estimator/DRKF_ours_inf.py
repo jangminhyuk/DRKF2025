@@ -50,7 +50,8 @@ class DRKF_ours_inf(BaseFilter):
         theta_w = cp.Parameter(nonneg=True, name='theta_w')
         Sigma_v_hat = cp.Parameter((self.ny, self.ny), name='Sigma_v_hat')  # nominal measurement noise covariance
         theta_v = cp.Parameter(nonneg=True, name='theta_v')
-        
+        lam_min_v_nom = cp.Parameter(nonneg=True, name='lam_min_v')
+        lam_min_w_nom = cp.Parameter(nonneg=True, name='lam_min_w')
         
         # Objective: maximize trace(X)
         obj = cp.Maximize(cp.trace(X))
@@ -71,8 +72,10 @@ class DRKF_ours_inf(BaseFilter):
             X_pred == self.A @ X @ self.A.T + Sigma_w,             
             X >> 0,
             X_pred >> 0,
-            Sigma_v >> 0,
-            Sigma_w >> 0
+            #Sigma_v >> 0,
+            #Sigma_w >> 0
+            Sigma_v >> lam_min_v_nom * np.eye(self.ny),
+            Sigma_w >> lam_min_w_nom * np.eye(self.nx)
         ]
         
         prob = cp.Problem(obj, constraints)
@@ -85,6 +88,8 @@ class DRKF_ours_inf(BaseFilter):
         params[1].value = self.theta_w
         params[2].value = self.nominal_Sigma_v
         params[3].value = self.theta_v
+        params[4].value = np.min(np.real(np.linalg.eigvals(self.nominal_Sigma_v)))
+        params[5].value = np.min(np.real(np.linalg.eigvals(self.nominal_Sigma_w)))
         
         prob.solve(solver=cp.MOSEK)
         
