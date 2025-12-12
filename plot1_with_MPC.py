@@ -1109,10 +1109,10 @@ def main(dist):
         'inf': "Steady-state KF",
         'risk': "Risk-Sensitive Filter (risk-averse)",
         'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
-        'drkf_neurips': "Time-varying DRKF [9]",
-        'bcot': "Time-varying DRKF [12]",
-        'drkf_finite_cdc': "Time-varying DRKF [14]",
-        'drkf_inf_cdc': "Steady-state DRKF [14]",
+        'drkf_neurips': "Time-varying DRKF [16]",
+        'bcot': "Time-varying DRKF [19]",
+        'drkf_finite_cdc': "Time-varying DRKF [21]",
+        'drkf_inf_cdc': "Steady-state DRKF [21]",
         'drkf_finite': "Time-varying DRKF (ours)",
         'drkf_inf': "Steady-state DRKF (ours)"
     }
@@ -1218,10 +1218,10 @@ def create_combined_plots():
         'inf': "Steady-state KF",
         'risk': "Risk-Sensitive Filter (risk-averse)",
         'risk_seek': "Risk-Sensitive Filter (risk-seeking)", 
-        'drkf_neurips': "Time-varying DRKF [9]", 
-        'bcot': "Time-varying DRKF [12]",
-        'drkf_finite_cdc': "Time-varying DRKF [14]",
-        'drkf_inf_cdc': "Steady-state DRKF [14]",
+        'drkf_neurips': "Time-varying DRKF [16]", 
+        'bcot': "Time-varying DRKF [19]",
+        'drkf_finite_cdc': "Time-varying DRKF [21]",
+        'drkf_inf_cdc': "Steady-state DRKF [21]",
         'drkf_finite': "Time-varying DRKF (ours)",
         'drkf_inf': "Steady-state DRKF (ours)"
     }
