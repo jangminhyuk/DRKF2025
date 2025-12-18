@@ -13,9 +13,9 @@ Distributionally Robust Kalman Filter
 - (pickle5) install if you encounter compatibility issues with pickle
 - joblib (>=1.4.2, Used for parallel computation)
 
-### Figure 1, 2
+### Figure 1
 
-- For Gaussian uncertainties (Figure 1)
+- For Gaussian uncertainties
 
 ```
 python main0.py --dist normal
@@ -25,7 +25,7 @@ Then run
 python plot0.py --dist normal
 ```
 
-- For U-Quadratic uncertainties (Figure 2)
+- For U-Quadratic uncertainties
 
 ```
 python main0.py --dist quadratic
@@ -33,6 +33,16 @@ python main0.py --dist quadratic
 Then run
 ```
 python plot0.py --dist quadratic
+```
+
+### Figure 2
+Effect of number of samples
+```
+python main0_numsample.py
+```
+Then run
+```
+python plot0_numsample.py
 ```
 
 ### Figure 3
@@ -72,17 +82,13 @@ Then run
 ```
 python plot4_time.py
 ```
-### Figure 7
-Average offline computation time (scalability w.r.t system dimension)
-```
-python main5_time.py
-```
-Then run
-```
-python plot5_time.py
-```
-### Figure 8, 9
+### Figure 7, 8
 DRKF Sandwich property
 ```
 python ellipses_visualization_new.py
+```
+### Figure 9
+Convergence property
+```
+python convergence_check.py
 ```
