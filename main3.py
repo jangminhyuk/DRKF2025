@@ -14,7 +14,7 @@ import pandas as pd
 from estimator.KF import KF
 from estimator.DRKF_ours_inf import DRKF_ours_inf
 from common_utils import (save_data, is_stabilizable, is_detectable, is_positive_definite,
-                         enforce_positive_definiteness)
+                         enforce_positive_definiteness, check_assumption_4, calculate_overline_lambda)
 
 from estimator.base_filter import BaseFilter
 
@@ -62,7 +62,7 @@ def generate_data(T, nx, ny, A, C, mu_w, Sigma_w, mu_v, Sigma_v,
     return x_true_all, y_all
 
 # --- Modified Experiment Function ---
-def run_experiment(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total):
+def run_experiment(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total, check_assumption4=False):
     # Use proper seed spacing to avoid correlation between experiments
     experiment_seed = seed_base + exp_idx * 12345
     np.random.seed(experiment_seed)
@@ -187,6 +187,17 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total)
         print("Warning: nominal_Sigma_v (noise covariance) is not positive definite!")
         exit()
     
+    # --- Check Assumption 4 (if enabled) ---
+    assumption_4_info = None
+    if check_assumption4:
+        assumption_holds, rank_A, rank_augmented, overline_lambda_w = check_assumption_4(A, nominal_Sigma_w, theta_w)
+        assumption_4_info = {
+            'holds': assumption_holds,
+            'rank_A': rank_A,
+            'rank_augmented': rank_augmented,
+            'overline_lambda_w': overline_lambda_w,
+            'theta_w': theta_w
+        }
     
     # --- Generate Shared Noise Sequences for Fair Comparison ---
     # Generate noise sequences once per experiment, reuse across all filters
@@ -265,11 +276,12 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total)
         'theta_v': theta_v,
         'standard_kf_mse': mse_mean_standard_kf,
         'drkf_mse': mse_mean_drkf,
-        'regret': regret_drkf
+        'regret': regret_drkf,
+        'assumption_4_info': assumption_4_info
     }
 
 # --- Main Routine ---
-def main(dist, num_sim, num_exp, T_total):
+def main(dist, num_sim, num_exp, T_total, check_assumption4=False):
     seed_base = 2024
     
     # Define theta_w and theta_v ranges for 3D plotting - denser grid for smoother plots
@@ -278,9 +290,14 @@ def main(dist, num_sim, num_exp, T_total):
     
     # Storage for 3D plotting data
     regret_data = []
+    assumption_4_results = {}  # Track Assumption 4 verification results
     
     total_combinations = len(theta_w_vals) * len(theta_v_vals)
     combination_count = 0
+    
+    if check_assumption4:
+        print("\n=== Checking Assumption 4 Throughout Experiments ===")
+        print("Assumption 4: rank([A  overline_lambda_w * I - hat_Sigma_w]) = rank(A)")
     
     for theta_w in theta_w_vals:
         for theta_v in theta_v_vals:
@@ -288,7 +305,7 @@ def main(dist, num_sim, num_exp, T_total):
             print(f"Running experiments for theta_w={theta_w}, theta_v={theta_v} ({combination_count}/{total_combinations})")
             
             experiments = Parallel(n_jobs=-1)(
-                delayed(run_experiment)(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total)
+                delayed(run_experiment)(exp_idx, dist, num_sim, seed_base, theta_w, theta_v, T_total, check_assumption4)
                 for exp_idx in range(num_exp)
             )
             
@@ -296,6 +313,31 @@ def main(dist, num_sim, num_exp, T_total):
             regrets = [exp['regret'] for exp in experiments]
             avg_regret = np.mean(regrets)
             std_regret = np.std(regrets)
+            
+            # Check Assumption 4 for this theta_w, theta_v combination (if enabled)
+            if check_assumption4:
+                assumption_4_checks = [exp['assumption_4_info'] for exp in experiments if exp['assumption_4_info'] is not None]
+                if assumption_4_checks:
+                    assumption_4_holds_all = all(check['holds'] for check in assumption_4_checks)
+                    assumption_4_count = sum(1 for check in assumption_4_checks if check['holds'])
+                    
+                    print(f"    Assumption 4 check for θ_w = {theta_w}, θ_v = {theta_v}:")
+                    print(f"      Holds in {assumption_4_count}/{len(assumption_4_checks)} experiments")
+                    print(f"      rank(A) = {assumption_4_checks[0]['rank_A']}, overline_lambda_w = {assumption_4_checks[0]['overline_lambda_w']:.6f}")
+                    if not assumption_4_holds_all:
+                        failed_ranks = [check['rank_augmented'] for check in assumption_4_checks if not check['holds']]
+                        print(f"      Failed cases had rank([A overline_lambda*I-hat_Sigma_w]) = {set(failed_ranks)}")
+                    
+                    assumption_4_results[(theta_w, theta_v)] = {
+                        'holds_all': assumption_4_holds_all,
+                        'holds_count': assumption_4_count,
+                        'total_experiments': len(assumption_4_checks),
+                        'rank_A': assumption_4_checks[0]['rank_A'],
+                        'overline_lambda_w': assumption_4_checks[0]['overline_lambda_w'],
+                        'theta_w': theta_w,
+                        'theta_v': theta_v,
+                        'details': assumption_4_checks
+                    }
             
             regret_data.append({
                 'theta_w': theta_w,
@@ -318,6 +360,27 @@ def main(dist, num_sim, num_exp, T_total):
     df = pd.DataFrame(regret_data)
     df.to_csv(os.path.join(results_path, f'regret_3d_data_{dist}.csv'), index=False)
     
+    # --- Print Assumption 4 Summary (if enabled) ---
+    if check_assumption4:
+        print("\n=== Assumption 4 Summary ===")
+        print("Assumption 4: rank([A  overline_lambda_w * I - hat_Sigma_w]) = rank(A)")
+        print(f"{'θ_w':<8} {'θ_v':<8} {'Holds':<8} {'Success Rate':<15} {'overline_lambda_w':<20}")
+        print("-" * 65)
+        
+        for (theta_w, theta_v), result in assumption_4_results.items():
+            holds_str = "Yes" if result['holds_all'] else "No"
+            success_rate = f"{result['holds_count']}/{result['total_experiments']}"
+            overline_lambda = result['overline_lambda_w']
+            print(f"{theta_w:<8.3f} {theta_v:<8.3f} {holds_str:<8} {success_rate:<15} {overline_lambda:<20.6f}")
+        
+        print(f"\nOverall Assumption 4 Analysis:")
+        total_holds = sum(1 for r in assumption_4_results.values() if r['holds_all'])
+        total_tested = len(assumption_4_results)
+        print(f"  Assumption 4 holds for all experiments in {total_holds}/{total_tested} (θ_w, θ_v) combinations tested")
+        
+        # Save Assumption 4 results
+        save_data(os.path.join(results_path, f'assumption_4_results_{dist}_3d.pkl'), assumption_4_results)
+    
     print(f"\n3D plotting data saved to {results_path}")
     print(f"Generated {len(regret_data)} data points for theta_w x theta_v combinations")
     
@@ -333,5 +396,7 @@ if __name__ == "__main__":
                         help="Number of independent experiments")
     parser.add_argument('--time', default=5, type=int,
                         help="Total simulation time")
+    parser.add_argument('--check_assumption4', action='store_true',
+                        help="Enable Assumption 4 verification (default: disabled)")
     args = parser.parse_args()
-    main(args.dist, args.num_sim, args.num_exp, args.time)
+    main(args.dist, args.num_sim, args.num_exp, args.time, args.check_assumption4)

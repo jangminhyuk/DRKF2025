@@ -5,7 +5,7 @@ Common utility functions used across the project.
 
 import numpy as np
 import pickle
-from scipy.linalg import solve_discrete_are
+from scipy.linalg import solve_discrete_are, eigvals
 
 def save_data(path, data):
     """Save data to a pickle file."""
@@ -100,3 +100,42 @@ def compute_mpc_cost(result, Q_lqr, R_lqr, desired_traj):
     cost += (final_error.T @ Q_lqr @ final_error)[0, 0]
     
     return cost
+
+def calculate_overline_lambda(nominal_matrix, theta_w):
+    """
+    Calculate the scalar overline_lambda = (sqrt(lambda_max_nominal) + theta_w)^2
+    where lambda_max_nominal is the maximum real eigenvalue of the symmetrized nominal_matrix.
+    """
+    nominal_matrix = (nominal_matrix + nominal_matrix.T) / 2
+    nominal_eigs = eigvals(nominal_matrix)
+    lambda_max_nominal = np.max(np.real(nominal_eigs))
+    overline_lambda = (np.sqrt(lambda_max_nominal) + theta_w)**2
+    return overline_lambda
+
+def check_assumption_4(A, nominal_Sigma_w, theta_w):
+    """
+    Check Assumption 4: rank([A  overline_lambda_w * I - hat_Sigma_w]) = rank(A)
+    
+    Args:
+        A: System matrix
+        nominal_Sigma_w: Estimated process noise covariance matrix
+        theta_w: Robust parameter for process noise
+        
+    Returns:
+        tuple: (assumption_holds, rank_A, rank_augmented, overline_lambda_w)
+    """
+    # Calculate overline_lambda_w using nominal_Sigma_w
+    overline_lambda_w = calculate_overline_lambda(nominal_Sigma_w, theta_w)
+    
+    # Calculate ranks
+    rank_A = np.linalg.matrix_rank(A)
+    
+    # Create the augmented matrix [A  overline_lambda_w * I - hat_Sigma_w]
+    nx = A.shape[0]
+    I = np.eye(nx)
+    augmented_matrix = np.hstack([A, overline_lambda_w * I - nominal_Sigma_w])
+    rank_augmented = np.linalg.matrix_rank(augmented_matrix)
+    
+    assumption_holds = (rank_A == rank_augmented)
+    
+    return assumption_holds, rank_A, rank_augmented, overline_lambda_w

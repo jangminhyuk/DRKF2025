@@ -6,6 +6,7 @@ from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 from numpy.linalg import eigvalsh
 import os
+from common_utils import check_assumption_4, calculate_overline_lambda
 
 np.random.seed(42)
 
@@ -354,6 +355,20 @@ def run_dr_kf_once(n=2, m=1, steps=200, T=20, q=100,
         )
 
         print(f"[INFO] theta_w = {theta_w}, theta_v = {theta_v}")
+        
+        # --- Check Assumption 4 ---
+        try:
+            assumption_holds, rank_A, rank_augmented, overline_lambda_w = check_assumption_4(A, Sigma_w_nom, theta_w)
+            print(f"[INFO] Assumption 4 check:")
+            print(f"       rank(A) = {rank_A}")
+            print(f"       rank([A  overline_lambda_w*I - hat_Sigma_w]) = {rank_augmented}")
+            print(f"       overline_lambda_w = {overline_lambda_w:.6f}")
+            print(f"       Assumption 4 holds: {assumption_holds}")
+            if not assumption_holds:
+                print(f"[WARN] Assumption 4 violated: rank condition not satisfied")
+        except Exception as e:
+            print(f"[WARN] Error checking Assumption 4: {e}")
+        
         if (theta_w is None) or (theta_v is None) or np.isnan(theta_w) or np.isnan(theta_v):
             print("[WARN] theta computation infeasible.")
             return None

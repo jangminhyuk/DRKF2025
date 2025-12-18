@@ -10,6 +10,7 @@ import pickle
 from joblib import Parallel, delayed
 from pykalman import KalmanFilter
 import matplotlib.pyplot as plt
+from scipy.linalg import eigvals
 
 from estimator.KF import KF
 from estimator.KF_inf import KF_inf
@@ -22,7 +23,7 @@ from estimator.risk_sensitive import RiskSensitive
 from estimator.risk_seek import RiskSeek
 from estimator.DRKF_neurips import DRKF_neurips
 from common_utils import (save_data, is_stabilizable, is_detectable, is_positive_definite,
-                         enforce_positive_definiteness)
+                         enforce_positive_definiteness, check_assumption_4, calculate_overline_lambda)
 
 # Import distribution functions from base filter
 from estimator.base_filter import BaseFilter
@@ -43,6 +44,7 @@ def uniform(a, b, N=1):
 def quadratic(w_max, w_min, N=1):
     result = _sampler.quadratic(w_max, w_min, N)
     return result.T if N > 1 else result
+
 
 
 # --- True Data Generation ---
@@ -73,7 +75,7 @@ def generate_data(T, nx, ny, A, C, mu_w, Sigma_w, mu_v, M,
 
 
 # --- Modified Experiment Function ---
-def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_execute):
+def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_execute, check_assumption4=False):
     # Use proper seed spacing to avoid correlation between experiments
     experiment_seed = seed_base + exp_idx * 12345
     np.random.seed(experiment_seed)
@@ -196,6 +198,17 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_exe
         print("Warning: nominal_Sigma_v (noise covariance) is not positive definite!")
         exit()
     
+    # --- Check Assumption 4 (if enabled) ---
+    assumption_4_info = None
+    if check_assumption4:
+        assumption_holds, rank_A, rank_augmented, overline_lambda_w = check_assumption_4(A, nominal_Sigma_w, robust_val)
+        assumption_4_info = {
+            'holds': assumption_holds,
+            'rank_A': rank_A,
+            'rank_augmented': rank_augmented,
+            'overline_lambda_w': overline_lambda_w,
+            'theta_w': robust_val
+        }
     
     # --- Generate Shared Noise Sequences for Fair Comparison ---
     # Generate noise sequences once per experiment, reuse across all filters
@@ -518,10 +531,10 @@ def run_experiment(exp_idx, dist, num_sim, seed_base, robust_val, filters_to_exe
                 'success_rate': filter_results[filter_name]['num_valid'] / filter_results[filter_name]['num_total']
             }
     
-    return overall_results, raw_results
+    return overall_results, raw_results, assumption_4_info
 
 # --- Main Routine ---
-def main(dist, num_sim, num_exp ):
+def main(dist, num_sim, num_exp, check_assumption4=False):
     seed_base = 2024
     
     # Ensure global reproducibility
@@ -551,6 +564,11 @@ def main(dist, num_sim, num_exp ):
     all_results = {}
     raw_experiments_data = {}   # Store raw experiments for each robust candidate.
     failed_theta_filters = {}  # Track filters that failed for specific theta values
+    assumption_4_results = {}  # Track Assumption 4 verification results
+    
+    if check_assumption4:
+        print("\n=== Checking Assumption 4 Throughout Experiments ===")
+        print("Assumption 4: rank([A  overline_lambda_w * I - hat_Sigma_w]) = rank(A)")
     
     for robust_val in robust_vals:
         # Check if any filters should be skipped for this theta value
@@ -576,11 +594,36 @@ def main(dist, num_sim, num_exp ):
         print(f"Running experiments for robust parameter = {robust_val}")
         # Use deterministic parallel execution - each experiment has its own unique seed
         experiments = Parallel(n_jobs=-1, backend='loky')(
-            delayed(run_experiment)(exp_idx, dist, num_sim, seed_base, robust_val, current_filters)
+            delayed(run_experiment)(exp_idx, dist, num_sim, seed_base, robust_val, current_filters, check_assumption4)
             for exp_idx in range(num_exp)
         )
         # Unpack overall results from the tuple returned by run_experiment.
         overall_experiments = [exp[0] for exp in experiments]
+        assumption_4_checks = [exp[2] for exp in experiments]  # Extract Assumption 4 info
+        
+        # Check Assumption 4 for this robust_val (if enabled)
+        if check_assumption4:
+            # Filter out None values (when assumption checking was disabled)
+            valid_checks = [check for check in assumption_4_checks if check is not None]
+            if valid_checks:
+                assumption_4_holds_all = all(check['holds'] for check in valid_checks)
+                assumption_4_count = sum(1 for check in valid_checks if check['holds'])
+                
+                print(f"  Assumption 4 check for θ_w = {robust_val}:")
+                print(f"    Holds in {assumption_4_count}/{len(valid_checks)} experiments")
+                print(f"    rank(A) = {valid_checks[0]['rank_A']}, overline_lambda_w = {valid_checks[0]['overline_lambda_w']:.6f}")
+                if not assumption_4_holds_all:
+                    failed_ranks = [check['rank_augmented'] for check in valid_checks if not check['holds']]
+                    print(f"    Failed cases had rank([A overline_lambda*I-hat_Sigma_w]) = {set(failed_ranks)}")
+                
+                assumption_4_results[robust_val] = {
+                    'holds_all': assumption_4_holds_all,
+                    'holds_count': assumption_4_count,
+                    'total_experiments': len(valid_checks),
+                    'rank_A': valid_checks[0]['rank_A'],
+                    'overline_lambda_w': valid_checks[0]['overline_lambda_w'],
+                    'details': valid_checks
+                }
         all_mse = {key: [] for key in current_filters}
         all_regret = {key: [] for key in current_filters}
         failed_filters_this_theta = set()  # Track filters that failed for this theta
@@ -714,6 +757,29 @@ def main(dist, num_sim, num_exp ):
     save_data(os.path.join(results_path, f'raw_experiments_{dist}_estimation.pkl'), raw_experiments_data)
     print("State estimation experiments completed for all robust parameters.")
     
+    # --- Print Assumption 4 Summary (if enabled) ---
+    if check_assumption4:
+        print("\n=== Assumption 4 Summary ===")
+        print("Assumption 4: rank([A  overline_lambda_w * I - hat_Sigma_w]) = rank(A)")
+        print(f"{'θ_w':<8} {'Holds':<8} {'Success Rate':<15} {'overline_lambda_w':<20}")
+        print("-" * 55)
+        
+        for robust_val in robust_vals:
+            if robust_val in assumption_4_results:
+                result = assumption_4_results[robust_val]
+                holds_str = "Yes" if result['holds_all'] else "No"
+                success_rate = f"{result['holds_count']}/{result['total_experiments']}"
+                overline_lambda = result['overline_lambda_w']
+                print(f"{robust_val:<8.3f} {holds_str:<8} {success_rate:<15} {overline_lambda:<20.6f}")
+        
+        print("\nOverall Assumption 4 Analysis:")
+        total_holds = sum(1 for r in assumption_4_results.values() if r['holds_all'])
+        total_tested = len(assumption_4_results)
+        print(f"  Assumption 4 holds for all experiments in {total_holds}/{total_tested} θ_w values tested")
+        
+        # Save Assumption 4 results
+        save_data(os.path.join(results_path, f'assumption_4_results_{dist}_estimation.pkl'), assumption_4_results)
+    
     # --- Print Readable Data for the User ---
     print("\nDetailed Experiment Results (MSE-optimized):")
     header = "{:<50} {:<35} {:<35} {:<15}".format("Method", "Average MSE", "Average Regret", "Best theta")
@@ -759,5 +825,7 @@ if __name__ == "__main__":
                         help="Number of simulation runs per experiment")
     parser.add_argument('--num_exp', default=20, type=int,
                         help="Number of independent experiments")
+    parser.add_argument('--check_assumption4', action='store_true',
+                        help="Enable Assumption 4 verification (default: disabled)")
     args = parser.parse_args()
-    main(args.dist, args.num_sim, args.num_exp)
+    main(args.dist, args.num_sim, args.num_exp, args.check_assumption4)
