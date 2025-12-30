@@ -6,7 +6,6 @@ from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 from numpy.linalg import eigvalsh
 import os
-from common_utils import check_assumption_4, calculate_overline_lambda
 
 np.random.seed(42)
 
@@ -172,162 +171,9 @@ def dr_kf_solve_onestep(Sigma_x_prev, A, C, Sigma_w_nom, Sigma_v_nom, theta_w, t
 
 
 
-def compute_matrices(T, A, Sigma_w_nom, C, Sigma_v_nom):
-    n = A.shape[0]
-    m = C.shape[0]
-    Sigma_v_nom = enforce_positive_definiteness(Sigma_v_nom, epsilon=1e-3)
-    B = np.linalg.cholesky(Sigma_w_nom)
-    sqrt_Sigma_v_nom = np.linalg.cholesky(Sigma_v_nom)
-    
-    # 1. R_T: [B, A·B, A²·B, …, A^(T-1)·B]
-    R_T_blocks = [np.linalg.matrix_power(A, i) @ B for i in range(T)]
-    R_T = np.hstack(R_T_blocks)
-    
-    # 2. O_T: Vertical stacking of [C A^(T-1); C A^(T-2); ...; C]
-    O_T_blocks = [C @ np.linalg.matrix_power(A, T-1-i) for i in range(T)]
-    O_T = np.vstack(O_T_blocks)
-    if np.linalg.matrix_rank(O_T) < n:
-        raise ValueError(f"O_T does not have full column rank; (A,C) may not be observable with T={T}")
-    
-    # 3. O_T^R: Vertical stacking of [A^(T-1); A^(T-2); …; I]
-    O_T_R_blocks = [np.linalg.matrix_power(A, T-1-i) for i in range(T)]
-    O_T_R = np.vstack(O_T_R_blocks)
-    
-    # 4. D_T: I_T ⊗ sqrt(Sigma_v_nom)
-    D_T = np.kron(np.eye(T), sqrt_Sigma_v_nom)
-    
-    # 5. Build block Hankel matrices L_T and H_T.
-    L_blocks = [[(np.linalg.matrix_power(A, j-i-1) @ B) if (j - i >= 1) else np.zeros((n, n))
-                 for j in range(T)] for i in range(T)]
-    H_blocks = [[(C @ (np.linalg.matrix_power(A, j-i-1) @ B)) if (j - i >= 1) else np.zeros((m, n))
-                 for j in range(T)] for i in range(T)]
-    L_T = np.block(L_blocks)
-    H_T = np.block(H_blocks)
-    
-    # 6. Compute tilde_phi_T.
-    I_inner = np.eye(T * n)
-    DDT = D_T @ D_T.T
-    inv_DDT = np.linalg.inv(DDT)
-    inner_term = I_inner + H_T.T @ inv_DDT @ H_T
-    inner_inv = np.linalg.inv(inner_term)
-    M = L_T @ inner_inv @ L_T.T
-    eigvals = np.linalg.eigvals(M)
-    lambda_max_val = np.max(np.real(eigvals))
-    tilde_phi_T = 1.0 / lambda_max_val
-    
-    return {
-        "R_T": R_T,
-        "O_T": O_T,
-        "O_T_R": O_T_R,
-        "D_T": D_T,
-        "L_T": L_T,
-        "H_T": H_T,
-        "tilde_phi_T": tilde_phi_T
-    }
-
-def find_phi_T(O_T, O_T_R, L_T, H_T, D_T, tilde_phi_T, tol_eig=1e-10, bisection_tol=1e-10, max_iter=1000):
-    M = D_T @ D_T.T + H_T @ H_T.T
-    M_inv = np.linalg.inv(M)
-    J_T = O_T_R - L_T @ H_T.T @ M_inv @ O_T
-    Omega_T = O_T.T @ M_inv @ O_T
-
-    eig_vals = np.linalg.eigvals(Omega_T)
-    lambda_min = np.min(np.real(eig_vals))
-    if lambda_min < 0:
-        raise ValueError("Omega_T is not positive definite. Check that all assumptions are met.")
-
-    I_N = np.eye(L_T.shape[1])
-    inv_DDT = np.linalg.inv(D_T @ D_T.T)
-    inner_term = I_N + H_T.T @ inv_DDT @ H_T
-    inner_inv = np.linalg.inv(inner_term)
-    I_full = np.eye(L_T.shape[0])
-
-    def lambda_min_Omega(phi):
-        S_phi = - (1.0 / phi) * I_full + L_T @ inner_inv @ L_T.T
-        try:
-            S_phi_inv = np.linalg.inv(S_phi)
-        except np.linalg.LinAlgError:
-            return -np.inf
-        Omega_phi = Omega_T + J_T.T @ S_phi_inv @ J_T
-        Omega_phi = (Omega_phi + Omega_phi.T) / 2.0
-        eigvals = np.linalg.eigvals(Omega_phi)
-        return np.min(np.real(eigvals))
-
-    phi_lower = 0.0
-    phi_upper = tilde_phi_T
-    iteration = 0
-    while (phi_upper - phi_lower) > bisection_tol and iteration < max_iter:
-        iteration += 1
-        phi_mid = (phi_lower + phi_upper) / 2.0
-        f_mid = lambda_min_Omega(phi_mid)
-        if f_mid > tol_eig:
-            phi_lower = phi_mid
-        else:
-            phi_upper = phi_mid
-
-    phi_final = phi_lower
-    return phi_final
-
-def dbg(on, msg, **vals):
-    if on:
-        payload = " | ".join(f"{k}={v}" for k, v in vals.items())
-        print(f"[θ-debug] {msg}" + (f" :: {payload}" if payload else ""))
-
-def _solve_theta_from_delta(a_nonneg, delta_max):
-    a = max(0.0, float(a_nonneg))
-    return max(0.0, (a*a + float(delta_max))**0.5 - a)
 
 
-def compute_theta_w_and_v(A, C, Sigma_w_nom, Sigma_v_nom, phi_T):
-    """Compute theta_w_max and theta_v_max with equal split φv = φx = φT/2.
-    
-    Args:
-        A: System matrix
-        C: Observation matrix  
-        Sigma_w_nom: Nominal process noise covariance
-        Sigma_v_nom: Nominal measurement noise covariance
-        phi_T: Contraction parameter
-        
-    Returns:
-        tuple: (theta_w_max, theta_v_max) uncertainty radii
-    """
-    eps = 1e-9  # for strict inequalities
-    
-    # Precompute values
-    sC = np.linalg.norm(C, 2)
-    Ap = np.linalg.pinv(A)
-    sAp = np.linalg.norm(Ap, 2)
-    
-    # Eigenvalues of covariance matrices
-    lam_w = np.linalg.eigvals(Sigma_w_nom)
-    lam_v = np.linalg.eigvals(Sigma_v_nom)
-    lam_w_min = np.min(np.real(lam_w))
-    lam_w_max = np.max(np.real(lam_w))
-    lam_v_min = np.min(np.real(lam_v))
-    lam_v_max = np.max(np.real(lam_v))
-    
-    # Maximum delta_x
-    delta_x_max = 1.0 / lam_w_min + (sC**2) / lam_v_min
-    
-    # Set phi splits with feasibility check
-    phi_x = phi_T / 2.0
-    phi_v = phi_T / 2.0
-    
-    # Check feasibility: require φx < δx_max
-    if phi_T / 2.0 >= delta_x_max:
-        print(f"[INFO] Feasibility check failed: φT/2 = {phi_T/2.0:.6f} >= δx_max = {delta_x_max:.6f}")
-        print(f"[INFO] Modifying phi_x = {delta_x_max - eps:.6f}, phi_v = {phi_T - (delta_x_max - eps):.6f}")
-        phi_x = delta_x_max - eps
-        phi_v = phi_T - phi_x
-    
-    # Measurement side calculation
-    delta_v_max = phi_v * (lam_v_min**2) / ((sC**2) + phi_v * lam_v_min)
-    theta_v_max = np.sqrt(lam_v_max + delta_v_max) - np.sqrt(lam_v_max)
-    
-    # Process side calculation  
-    theta_w_max = np.sqrt(lam_w_max + (phi_x / ((sAp**2) * delta_x_max * (delta_x_max - phi_x))) ) - np.sqrt(lam_w_max)
-    
-    return theta_w_max, theta_v_max
+
 
 
 
@@ -340,38 +186,13 @@ def run_dr_kf_once(n=2, m=1, steps=200, T=20, q=100,
         C = np.array([[1.0, -1.0]])
         Sigma_w_nom = 1.0 * np.eye(A.shape[0])
         Sigma_v_nom = 1.0 * np.eye(C.shape[0])
-        # --- φ_T ---
-        matrices = compute_matrices(T, A, Sigma_w_nom, C, Sigma_v_nom)
-        tilde_phi_T = matrices["tilde_phi_T"]
-        phi_T = find_phi_T(matrices["O_T"], matrices["O_T_R"],
-                           matrices["L_T"], matrices["H_T"],
-                           matrices["D_T"], tilde_phi_T)
+        # --- Use fixed theta values ---
+        theta_w = 0.1
+        theta_v = 0.1
+        theta_x0 = 0.1
 
-        print("[INFO] phi_T =", phi_T)
-
-        # --- θ_w, θ_v (with debug prints inside) ---
-        theta_w, theta_v = compute_theta_w_and_v(
-            A, C, Sigma_w_nom, Sigma_v_nom, phi_T
-        )
-
-        print(f"[INFO] theta_w = {theta_w}, theta_v = {theta_v}")
+        print(f"[INFO] Using fixed theta values: theta_w = {theta_w}, theta_v = {theta_v}, theta_x0 = {theta_x0}")
         
-        # --- Check Assumption 4 ---
-        try:
-            assumption_holds, rank_A, rank_augmented, overline_lambda_w = check_assumption_4(A, Sigma_w_nom, theta_w)
-            print(f"[INFO] Assumption 4 check:")
-            print(f"       rank(A) = {rank_A}")
-            print(f"       rank([A  overline_lambda_w*I - hat_Sigma_w]) = {rank_augmented}")
-            print(f"       overline_lambda_w = {overline_lambda_w:.6f}")
-            print(f"       Assumption 4 holds: {assumption_holds}")
-            if not assumption_holds:
-                print(f"[WARN] Assumption 4 violated: rank condition not satisfied")
-        except Exception as e:
-            print(f"[WARN] Error checking Assumption 4: {e}")
-        
-        if (theta_w is None) or (theta_v is None) or np.isnan(theta_w) or np.isnan(theta_v):
-            print("[WARN] theta computation infeasible.")
-            return None
 
         # --- initial posterior covariance (match system dimension!) ---
         nx = A.shape[0]
@@ -421,7 +242,7 @@ def run_dr_kf_once(n=2, m=1, steps=200, T=20, q=100,
         return {
             "A": A, "C": C,
             "Sigma_w_nom": Sigma_w_nom, "Sigma_v_nom": Sigma_v_nom,
-            "phi_T": phi_T, "theta_w": theta_w, "theta_v": theta_v,
+            "theta_w": theta_w, "theta_v": theta_v,
             "posterior_list": posterior_list, "conv_norms": conv_norms,
             "trace_rel_diff_list": trace_rel_diff_list, "Sigma_x_inf": Sigma_x_inf
         }
